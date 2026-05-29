@@ -8,8 +8,9 @@ function cropObjPos(x, y, w, h) {
 // ── Helper: genera tag <img> con object-position e data-c* per reimport ──
 function cropImg(url, x, y, w, h, cls) {
  if (!url) return '<img>';
- return '<img src="' + url + '"' + (cls ? ' class="' + cls + '"' : '')
+ return '<img' + (cls ? ' class="' + cls + '"' : '')
   + ' style="object-position:' + cropObjPos(x, y, w, h) + '"'
+  + ' src="' + url + '"'
   + ' data-cx="' + Math.round(x) + '" data-cy="' + Math.round(y) + '"'
   + ' data-cw="' + Math.round(w) + '" data-ch="' + Math.round(h) + '">';
 }
