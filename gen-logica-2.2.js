@@ -1036,7 +1036,7 @@ function costruisciNen(isNuova) {
  // Immagine nen
  html += '<div style="margin-top:16px; border-top:1px solid #3B8686; padding-top:16px;">';
  html += '<h4 style="color:#CFF09E; font-family:\'Montserrat\'; margin-bottom:12px;"><i class="fa-solid fa-image"></i> Immagine Nen</h4>';
- html += inputText('nen-img', 'URL immagine — dimensioni ideali: 664x200px.', 'https://...');
+ html += campoCropHTML('nen-img', 'URL immagine — dimensioni ideali: 664×200px', 'img-nen', 664, 200);
  html += '</div>';
 
  // Box 2: Profili (nascosto in Speed Duel)
@@ -1910,7 +1910,7 @@ function importaScheda() {
    } 
    // Immagine nen 
    var nenImgEl = divs[i].querySelector ? divs[i].querySelector('.nen-img') : null; 
-   if (nenImgEl) setVal('nen-img', nenImgEl.getAttribute('src')||''); 
+   if (nenImgEl) { setVal('nen-img', nenImgEl.getAttribute('src')||''); importaCrop(nenImgEl, 'img-nen'); }
    // Helper: legge le card di un nen-box e popola i campi tecnica/profilo 
    function leggiNenCards(box, prefisso, num) { 
     var cards = []; 
@@ -2314,6 +2314,10 @@ function raccogliDati(isNuova) {
    condizioni:    val('nen-condizioni')||'—'
   },
   nenImg: isNuova ? '' : (val('nen-img')||''),
+  nenImgX: (function(){ var e=document.getElementById('crop-x-img-nen'); return e?parseInt(e.value)||0:0; })(),
+  nenImgY: (function(){ var e=document.getElementById('crop-y-img-nen'); return e?parseInt(e.value)||0:0; })(),
+  nenImgW: (function(){ var e=document.getElementById('crop-w-img-nen'); return e?parseInt(e.value)||100:100; })(),
+  nenImgH: (function(){ var e=document.getElementById('crop-h-img-nen'); return e?parseInt(e.value)||100:100; })(),
   nenModo: (function(){ var r=document['querySelector']('input[name="nen-modalita"]:checked'); return r?r.value:'completo'; })(),
   profili: isNuova ? [] : (function(){
    var radio = document['querySelector']('input[name="nen-modalita"]:checked');
