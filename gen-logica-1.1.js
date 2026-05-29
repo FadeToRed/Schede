@@ -551,74 +551,375 @@ function aggiungiStatus() {
 }
 
 // ============================================================
-// SELETTORE POSIZIONE IMMAGINE (griglia 3x3)
+// CROP TOOL INTERATTIVO
 // ============================================================
-function selettorePosizione(id, defaultVal) {
- defaultVal = defaultVal || 'center center';
- var posizioni = [
-  ['left top','center top','right top'],
-  ['left center','center center','right center'],
-  ['left bottom','center bottom','right bottom']
- ];
- var etichette = [
-  ['↖','↑','↗'],
-  ['←','✛','→'],
-  ['↙','↓','↘']
- ];
- var html = '<div style="margin-top:6px; margin-bottom:14px;">';
- html += '<div style="color:#8FBEBA; font-size:0.78em; margin-bottom:6px;">Inquadratura — clicca per scegliere quale parte dell\'immagine mostrare se non rientra tutta:</div>';
- html += '<div style="display:inline-flex; flex-direction:column; gap:3px;" id="pos-grid-'+id+'">';
- for (var r = 0; r < 3; r++) {
-  html += '<div style="display:flex; gap:3px;">';
-  for (var c = 0; c < 3; c++) {
-   var val = posizioni[r][c];
-   var isDefault = (val === defaultVal);
-   var btnStyle = 'width:32px; height:32px; cursor:pointer; border-radius:5px; font-size:1em; border:2px solid ' + (isDefault ? '#CFF09E' : '#3B8686') + '; background:' + (isDefault ? '#1a3a1a' : '#292354') + '; color:' + (isDefault ? '#CFF09E' : '#8FBEBA') + '; transition:all 0.15s;';
-   html += '<button type="button" onclick="scegliPosizione(\''+id+'\',\''+val+'\')" title="'+val+'" style="'+btnStyle+'" id="pos-btn-'+id+'-'+r+'-'+c+'">'+etichette[r][c]+'</button>';
-  }
-  html += '</div>';
- }
+// Ogni istanza ha: contenitore preview, immagine scalata, rettangolo
+// di crop trascinabile, slider zoom. Salva object-position in % in
+// un hidden input. cropW/cropH sono le dimensioni REALI della slot.
+// Il PREVIEW_W fisso è 400px; l'altezza scala proporzionalmente.
+
+var CROP_PREVIEW_W = 400;
+
+function selettorePosizione(id, defaultVal, cropW, cropH) {
+ defaultVal = defaultVal || '50% 50%';
+ var previewH = Math.round(CROP_PREVIEW_W * cropH / cropW);
+ // Cap l'altezza preview a 320px per slot molto alte (es. 154x429)
+ var displayH = Math.min(previewH, 320);
+ var displayW = Math.round(displayH * cropW / cropH);
+
+ var html = '<div style="margin-top:6px; margin-bottom:18px;" id="crop-wrap-'+id+'">';
+ html += '<div style="color:#8FBEBA; font-size:0.78em; margin-bottom:8px;">📐 Trascina il riquadro per scegliere l\'inquadratura. Usa lo slider per zoomare.</div>';
+
+ // Contenitore esterno con overflow hidden = finestra di clip
+ html += '<div id="crop-outer-'+id+'" style="'
+  + 'position:relative; width:'+displayW+'px; height:'+displayH+'px; '
+  + 'overflow:hidden; border:2px solid #3B8686; border-radius:8px; '
+  + 'background:#111; cursor:grab; user-select:none; -webkit-user-select:none;">';
+
+ // Immagine sotto (scalata via transform-origin top left + scale)
+ html += '<img id="crop-img-'+id+'" src="" '
+  + 'style="position:absolute; top:0; left:0; transform-origin:top left; '
+  + 'display:none; pointer-events:none; max-width:none;">';
+
+ // Overlay scuro fuori dal crop rect — 4 pannelli attorno al rect
+ html += '<div id="crop-overlay-'+id+'" style="position:absolute;inset:0;pointer-events:none;display:none;">';
+ html += '<div id="crop-ov-top-'+id+'"    style="position:absolute;left:0;right:0;top:0;background:rgba(0,0,0,0.55);"></div>';
+ html += '<div id="crop-ov-bottom-'+id+'" style="position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,0.55);"></div>';
+ html += '<div id="crop-ov-left-'+id+'"   style="position:absolute;top:0;bottom:0;left:0;background:rgba(0,0,0,0.55);"></div>';
+ html += '<div id="crop-ov-right-'+id+'"  style="position:absolute;top:0;bottom:0;right:0;background:rgba(0,0,0,0.55);"></div>';
  html += '</div>';
+
+ // Rettangolo crop (bordo luminoso)
+ html += '<div id="crop-rect-'+id+'" style="'
+  + 'position:absolute; box-sizing:border-box; '
+  + 'border:2px solid #CFF09E; pointer-events:none; display:none; '
+  + 'box-shadow:0 0 0 9999px rgba(0,0,0,0.55);">'
+  + '</div>';
+
+ html += '</div>'; // fine crop-outer
+
+ // Slider zoom
+ html += '<div style="display:flex; align-items:center; gap:10px; margin-top:8px; width:'+displayW+'px;">';
+ html += '<span style="color:#8FBEBA; font-size:0.8em;">🔍−</span>';
+ html += '<input type="range" id="crop-zoom-'+id+'" min="100" max="300" value="100" step="1" '
+  + 'oninput="cropZoom(\''+id+'\')" '
+  + 'style="flex:1; accent-color:#CFF09E; cursor:pointer;">';
+ html += '<span style="color:#8FBEBA; font-size:0.8em;">+</span>';
+ html += '</div>';
+
+ // Placeholder "incolla un URL" visibile quando non c'è immagine
+ html += '<div id="crop-placeholder-'+id+'" style="'
+  + 'margin-top:8px; color:#3B8686; font-size:0.8em; font-style:italic;">'
+  + 'Inserisci un URL immagine qui sopra per attivare il crop.</div>';
+
  html += '<input type="hidden" id="pos-'+id+'" value="'+defaultVal+'">';
- html += '</div>';
+ // Dati runtime salvati in data-* sull'outer
+ html += '</div>'; // fine crop-wrap
  return html;
 }
 
-function scegliPosizione(id, valore) {
- var posizioni = [
-  ['left top','center top','right top'],
-  ['left center','center center','right center'],
-  ['left bottom','center bottom','right bottom']
- ];
- for (var r = 0; r < 3; r++) {
-  for (var c = 0; c < 3; c++) {
-   var btn = document.getElementById('pos-btn-'+id+'-'+r+'-'+c);
-   if (!btn) continue;
-   var isSelected = (posizioni[r][c] === valore);
-   btn.style.borderColor = isSelected ? '#CFF09E' : '#3B8686';
-   btn.style.background   = isSelected ? '#1a3a1a' : '#292354';
-   btn.style.color        = isSelected ? '#CFF09E' : '#8FBEBA';
-  }
+// Chiamata quando l'utente modifica il campo URL
+function cropCaricaImmagine(id, cropW, cropH) {
+ var urlEl = document.getElementById('campo-img-'+id.replace('img-',''));
+ // fallback per i casi in cui l'id del campo non segue la convenzione
+ if (!urlEl) {
+  // prova con il mapping esplicito
+  var mapId = {
+   'img-laterale':  'campo-img-laterale',
+   'img-dati':      'campo-img-dati',
+   'img-info':      'campo-img-info',
+   'img-info-a':    'campo-img-info-a',
+   'img-info-b':    'campo-img-info-b'
+  };
+  if (mapId[id]) urlEl = document.getElementById(mapId[id]);
  }
- var hidden = document.getElementById('pos-'+id);
- if (hidden) hidden.value = valore;
+ var url = urlEl ? urlEl.value.trim() : '';
+ var imgEl  = document.getElementById('crop-img-'+id);
+ var ph     = document.getElementById('crop-placeholder-'+id);
+ var outer  = document.getElementById('crop-outer-'+id);
+ if (!imgEl || !outer) return;
+
+ if (!url) {
+  imgEl.style.display = 'none';
+  document.getElementById('crop-rect-'+id).style.display = 'none';
+  document.getElementById('crop-overlay-'+id).style.display = 'none';
+  if (ph) ph.style.display = '';
+  return;
+ }
+ imgEl.onload = function() {
+  // Resetta zoom
+  var zoomEl = document.getElementById('crop-zoom-'+id);
+  if (zoomEl) zoomEl.value = 100;
+  outer.setAttribute('data-nat-w', imgEl.naturalWidth);
+  outer.setAttribute('data-nat-h', imgEl.naturalHeight);
+  outer.setAttribute('data-crop-w', cropW);
+  outer.setAttribute('data-crop-h', cropH);
+  cropAggiornaLayout(id);
+  imgEl.style.display = '';
+  document.getElementById('crop-rect-'+id).style.display = '';
+  document.getElementById('crop-overlay-'+id).style.display = '';
+  if (ph) ph.style.display = 'none';
+  // Bind drag
+  cropBindDrag(id);
+ };
+ imgEl.onerror = function() {
+  if (ph) { ph.style.display = ''; ph.textContent = '⚠️ Immagine non caricabile. Controlla il URL.'; }
+  imgEl.style.display = 'none';
+  document.getElementById('crop-rect-'+id).style.display = 'none';
+  document.getElementById('crop-overlay-'+id).style.display = 'none';
+ };
+ imgEl.src = url;
 }
 
-function costruisciImmagini() { 
- var html = inputText('campo-img-laterale','Immagine Header (URL) — dimensioni ideali: 664x184px. Immagini di dimensioni diverse verranno ridimensionate automaticamente.','https://...'); 
- html += selettorePosizione('img-laterale', 'center center');
- html += inputText('campo-img-dati','Immagine slide Dati (URL) — dimensioni ideali: 214x429px. Immagini di dimensioni diverse verranno ridimensionate automaticamente.','https://...'); 
- html += selettorePosizione('img-dati', 'center center');
- html += '<div style="margin-bottom:14px;">'; 
- html += '<label style="' + STILE_LABEL + '">Immagine slide Info</label>'; 
- html += '<div style="display:flex; gap:12px; margin-bottom:8px;">'; 
- html += '<label style="display:flex; align-items:center; gap:6px; color:#8FBEBA; font-size:0.85em; cursor:pointer;"><input type="radio" name="img-info-modo" value="1" checked onchange="aggiornaInputImgInfo()"> Una immagine</label>'; 
- html += '<label style="display:flex; align-items:center; gap:6px; color:#8FBEBA; font-size:0.85em; cursor:pointer;"><input type="radio" name="img-info-modo" value="2" onchange="aggiornaInputImgInfo()"> Due immagini</label>'; 
- html += '</div>'; 
- html += '<div id="img-info-wrap-1">' + inputText('campo-img-info','URL immagine — dimensioni ideali: 154x429px. Immagini di dimensioni diverse verranno ridimensionate automaticamente.','https://...') + selettorePosizione('img-info', 'center top') + '</div>'; 
- html += '<div id="img-info-wrap-2" style="display:none;">' + inputText('campo-img-info-a','URL immagine 1 — dimensioni ideali: 154x204px.','https://...') + selettorePosizione('img-info-a', 'center top') + inputText('campo-img-info-b','URL immagine 2 — dimensioni ideali: 154x204px.','https://...') + selettorePosizione('img-info-b', 'center top') + '</div>'; 
- html += '</div>'; 
- return html; 
+function cropZoom(id) {
+ cropAggiornaLayout(id);
+}
+
+function cropAggiornaLayout(id) {
+ var outer   = document.getElementById('crop-outer-'+id);
+ var imgEl   = document.getElementById('crop-img-'+id);
+ var rectEl  = document.getElementById('crop-rect-'+id);
+ var zoomEl  = document.getElementById('crop-zoom-'+id);
+ if (!outer || !imgEl || !rectEl) return;
+
+ var natW   = parseFloat(outer.getAttribute('data-nat-w')) || imgEl.naturalWidth;
+ var natH   = parseFloat(outer.getAttribute('data-nat-h')) || imgEl.naturalHeight;
+ var cropW  = parseFloat(outer.getAttribute('data-crop-w')) || 1;
+ var cropH  = parseFloat(outer.getAttribute('data-crop-h')) || 1;
+ var zoom   = zoomEl ? (parseFloat(zoomEl.value) / 100) : 1;
+
+ var outerW = outer.offsetWidth;
+ var outerH = outer.offsetHeight;
+
+ // Dimensioni immagine scalata: prima fit nell'outer, poi applica zoom
+ var scaleBase = Math.max(outerW / natW, outerH / natH);
+ var scale = scaleBase * zoom;
+ var imgW = natW * scale;
+ var imgH = natH * scale;
+
+ // Rettangolo crop in proporzione alle dimensioni della slot
+ var rectAspect = cropW / cropH;
+ var outerAspect = outerW / outerH;
+ var rectW, rectH;
+ if (rectAspect >= outerAspect) {
+  rectW = outerW * 0.92;
+  rectH = rectW / rectAspect;
+ } else {
+  rectH = outerH * 0.92;
+  rectW = rectH * rectAspect;
+ }
+
+ // Posizione corrente del crop rect (leggi da data o centra)
+ var prevRx = parseFloat(outer.getAttribute('data-rx'));
+ var prevRy = parseFloat(outer.getAttribute('data-ry'));
+ var rx, ry;
+ if (isNaN(prevRx)) {
+  rx = (outerW - rectW) / 2;
+  ry = (outerH - rectH) / 2;
+ } else {
+  // Mantieni la posizione percentuale rispetto all'outer
+  rx = prevRx;
+  ry = prevRy;
+ }
+ // Clamp
+ rx = Math.max(0, Math.min(outerW - rectW, rx));
+ ry = Math.max(0, Math.min(outerH - rectH, ry));
+
+ // Posizione immagine: il rect si muove sull'outer, che è una finestra
+ // sull'immagine. imgX,imgY = offset dell'immagine rispetto all'outer.
+ // Calcola in modo che il crop rect "veda" la parte giusta.
+ // Salviamo imgX,imgY come offset immagine (può essere negativo)
+ var prevIx = parseFloat(outer.getAttribute('data-ix'));
+ var prevIy = parseFloat(outer.getAttribute('data-iy'));
+ var ix, iy;
+ if (isNaN(prevIx)) {
+  ix = (outerW - imgW) / 2;
+  iy = (outerH - imgH) / 2;
+ } else {
+  // Riscala mantenendo il punto centrale visibile
+  var oldScale = parseFloat(outer.getAttribute('data-scale')) || scale;
+  var ratio = scale / oldScale;
+  var centerX = prevIx + (outerW / 2 - prevIx) * (1 - ratio) * 0; // semplificato
+  ix = prevIx * ratio + (outerW / 2) * (1 - ratio);
+  iy = prevIy * ratio + (outerH / 2) * (1 - ratio);
+ }
+ // Clamp immagine: non può uscire dal crop rect (il rect è finestra)
+ ix = Math.min(0, Math.max(outerW - imgW, ix));
+ iy = Math.min(0, Math.max(outerH - imgH, iy));
+
+ outer.setAttribute('data-rx', rx);
+ outer.setAttribute('data-ry', ry);
+ outer.setAttribute('data-ix', ix);
+ outer.setAttribute('data-iy', iy);
+ outer.setAttribute('data-scale', scale);
+ outer.setAttribute('data-rect-w', rectW);
+ outer.setAttribute('data-rect-h', rectH);
+ outer.setAttribute('data-img-w', imgW);
+ outer.setAttribute('data-img-h', imgH);
+
+ // Applica stili
+ imgEl.style.transform = 'scale('+scale+')';
+ imgEl.style.left = ix + 'px';
+ imgEl.style.top  = iy + 'px';
+ imgEl.style.width  = natW + 'px';
+ imgEl.style.height = natH + 'px';
+
+ rectEl.style.left   = rx + 'px';
+ rectEl.style.top    = ry + 'px';
+ rectEl.style.width  = rectW + 'px';
+ rectEl.style.height = rectH + 'px';
+
+ cropAggiornaOverlay(id, rx, ry, rectW, rectH, outerW, outerH);
+ cropSalvaPos(id);
+}
+
+function cropAggiornaOverlay(id, rx, ry, rw, rh, ow, oh) {
+ var top    = document.getElementById('crop-ov-top-'+id);
+ var bot    = document.getElementById('crop-ov-bottom-'+id);
+ var left   = document.getElementById('crop-ov-left-'+id);
+ var right  = document.getElementById('crop-ov-right-'+id);
+ if (!top) return;
+ top.style.height    = ry + 'px';
+ bot.style.top       = (ry + rh) + 'px';
+ bot.style.height    = (oh - ry - rh) + 'px';
+ left.style.top      = ry + 'px';
+ left.style.height   = rh + 'px';
+ left.style.width    = rx + 'px';
+ right.style.top     = ry + 'px';
+ right.style.height  = rh + 'px';
+ right.style.left    = (rx + rw) + 'px';
+ right.style.width   = (ow - rx - rw) + 'px';
+}
+
+function cropSalvaPos(id) {
+ var outer  = document.getElementById('crop-outer-'+id);
+ var hidden = document.getElementById('pos-'+id);
+ if (!outer || !hidden) return;
+ var ix = parseFloat(outer.getAttribute('data-ix')) || 0;
+ var iy = parseFloat(outer.getAttribute('data-iy')) || 0;
+ var imgW = parseFloat(outer.getAttribute('data-img-w')) || 1;
+ var imgH = parseFloat(outer.getAttribute('data-img-h')) || 1;
+ var rx   = parseFloat(outer.getAttribute('data-rx')) || 0;
+ var ry   = parseFloat(outer.getAttribute('data-ry')) || 0;
+ var rw   = parseFloat(outer.getAttribute('data-rect-w')) || 0;
+ var rh   = parseFloat(outer.getAttribute('data-rect-h')) || 0;
+
+ // Centro del crop rect nel sistema di coordinate dell'immagine scalata
+ var cx = rx - ix + rw / 2;
+ var cy = ry - iy + rh / 2;
+ // Converti in percentuale rispetto alle dimensioni immagine scalata
+ var px = Math.round(Math.max(0, Math.min(100, (cx / imgW) * 100)));
+ var py = Math.round(Math.max(0, Math.min(100, (cy / imgH) * 100)));
+ hidden.value = px + '% ' + py + '%';
+}
+
+var _cropDrag = {}; // stato drag per ogni id
+
+function cropBindDrag(id) {
+ var outer = document.getElementById('crop-outer-'+id);
+ if (!outer || outer.getAttribute('data-drag-bound')) return;
+ outer.setAttribute('data-drag-bound', '1');
+
+ function getPos(e) {
+  var r = outer.getBoundingClientRect();
+  var clientX = e.touches ? e.touches[0].clientX : e.clientX;
+  var clientY = e.touches ? e.touches[0].clientY : e.clientY;
+  return { x: clientX - r.left, y: clientY - r.top };
+ }
+
+ function onStart(e) {
+  e.preventDefault();
+  var p = getPos(e);
+  _cropDrag[id] = {
+   active: true,
+   startX: p.x,
+   startY: p.y,
+   startIx: parseFloat(outer.getAttribute('data-ix')) || 0,
+   startIy: parseFloat(outer.getAttribute('data-iy')) || 0
+  };
+  outer.style.cursor = 'grabbing';
+ }
+ function onMove(e) {
+  var d = _cropDrag[id];
+  if (!d || !d.active) return;
+  e.preventDefault();
+  var p = getPos(e);
+  var dx = p.x - d.startX;
+  var dy = p.y - d.startY;
+  var imgW = parseFloat(outer.getAttribute('data-img-w')) || 0;
+  var imgH = parseFloat(outer.getAttribute('data-img-h')) || 0;
+  var outerW = outer.offsetWidth;
+  var outerH = outer.offsetHeight;
+  var newIx = Math.min(0, Math.max(outerW - imgW, d.startIx + dx));
+  var newIy = Math.min(0, Math.max(outerH - imgH, d.startIy + dy));
+  outer.setAttribute('data-ix', newIx);
+  outer.setAttribute('data-iy', newIy);
+  var imgEl = document.getElementById('crop-img-'+id);
+  if (imgEl) { imgEl.style.left = newIx+'px'; imgEl.style.top = newIy+'px'; }
+  var rx = parseFloat(outer.getAttribute('data-rx')) || 0;
+  var ry = parseFloat(outer.getAttribute('data-ry')) || 0;
+  var rw = parseFloat(outer.getAttribute('data-rect-w')) || 0;
+  var rh = parseFloat(outer.getAttribute('data-rect-h')) || 0;
+  cropAggiornaOverlay(id, rx, ry, rw, rh, outerW, outerH);
+  cropSalvaPos(id);
+ }
+ function onEnd() {
+  if (_cropDrag[id]) _cropDrag[id].active = false;
+  outer.style.cursor = 'grab';
+ }
+
+ outer.addEventListener('mousedown',  onStart, {passive:false});
+ outer.addEventListener('touchstart', onStart, {passive:false});
+ document.addEventListener('mousemove',  onMove,  {passive:false});
+ document.addEventListener('touchmove',  onMove,  {passive:false});
+ document.addEventListener('mouseup',    onEnd);
+ document.addEventListener('touchend',   onEnd);
+}
+
+function costruisciImmagini() {
+ // Helper: campo URL + crop tool collegato
+ function campoCrop(campoId, label, placeholder, cropId, cropW, cropH) {
+  var extra = ' oninput="cropCaricaImmagine(\''+cropId+'\','+cropW+','+cropH+')"';
+  var html = '<div style="margin-bottom:6px;">';
+  html += '<label style="'+STILE_LABEL+'">'+label+'</label>';
+  html += '<input type="text" id="'+campoId+'" placeholder="'+placeholder+'"'+extra+' style="'+STILE_INPUT+'">';
+  html += '</div>';
+  html += selettorePosizione(cropId, '50% 50%', cropW, cropH);
+  return html;
+ }
+
+ var html = campoCrop('campo-img-laterale',
+  'Immagine Header (URL) — dimensioni ideali: 664×184px',
+  'https://...', 'img-laterale', 664, 184);
+
+ html += campoCrop('campo-img-dati',
+  'Immagine slide Dati (URL) — dimensioni ideali: 214×429px',
+  'https://...', 'img-dati', 214, 429);
+
+ html += '<div style="margin-bottom:14px;">';
+ html += '<label style="'+STILE_LABEL+'">Immagine slide Info</label>';
+ html += '<div style="display:flex; gap:12px; margin-bottom:8px;">';
+ html += '<label style="display:flex; align-items:center; gap:6px; color:#8FBEBA; font-size:0.85em; cursor:pointer;"><input type="radio" name="img-info-modo" value="1" checked onchange="aggiornaInputImgInfo()"> Una immagine</label>';
+ html += '<label style="display:flex; align-items:center; gap:6px; color:#8FBEBA; font-size:0.85em; cursor:pointer;"><input type="radio" name="img-info-modo" value="2" onchange="aggiornaInputImgInfo()"> Due immagini</label>';
+ html += '</div>';
+
+ html += '<div id="img-info-wrap-1">';
+ html += campoCrop('campo-img-info',
+  'URL immagine — dimensioni ideali: 154×429px',
+  'https://...', 'img-info', 154, 429);
+ html += '</div>';
+
+ html += '<div id="img-info-wrap-2" style="display:none;">';
+ html += campoCrop('campo-img-info-a',
+  'URL immagine 1 — dimensioni ideali: 154×204px',
+  'https://...', 'img-info-a', 154, 204);
+ html += campoCrop('campo-img-info-b',
+  'URL immagine 2 — dimensioni ideali: 154×204px',
+  'https://...', 'img-info-b', 154, 204);
+ html += '</div>';
+
+ html += '</div>';
+ return html;
 }
 
 function aggiornaInputImgInfo() { 
