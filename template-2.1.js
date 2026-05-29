@@ -6,9 +6,10 @@ function cropObjPos(x, y, w, h) {
 }
 
 // ── Helper: genera tag <img> con object-position e data-c* per reimport ──
-function cropImg(url, x, y, w, h) {
+function cropImg(url, x, y, w, h, cls) {
  if (!url) return '<img>';
- return '<img src="' + url + '" style="object-position:' + cropObjPos(x, y, w, h) + '"'
+ return '<img src="' + url + '"' + (cls ? ' class="' + cls + '"' : '')
+  + ' style="object-position:' + cropObjPos(x, y, w, h) + '"'
   + ' data-cx="' + Math.round(x) + '" data-cy="' + Math.round(y) + '"'
   + ' data-cw="' + Math.round(w) + '" data-ch="' + Math.round(h) + '">';
 }
@@ -460,7 +461,7 @@ var htmlNen = '';
   htmlBox1 += '</div></div>';
  
   // Immagine nen
-  var htmlNenImg = d.nenImg ? '<img class="nen-img" src="'+d.nenImg+'">' : '';
+  var htmlNenImg = d.nenImg ? cropImg(d.nenImg, d.nenImgX||0, d.nenImgY||0, d.nenImgW||100, d.nenImgH||100, 'nen-img') : '';
  
   // Box 2: Profili (omesso in Speed Duel)
   var htmlBox2 = '';
