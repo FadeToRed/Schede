@@ -679,7 +679,7 @@ function cropApriModal(id, slotW, slotH) {
 
   // Hint
   + '<p style="margin:0;font-size:0.82em;color:#8FBEBA;">'
-  + 'Trascina il riquadro per spostarlo · Trascina <strong style="color:#CFF09E;">↘</strong> per ridimensionarlo'
+  + 'Trascina il riquadro per spostarlo'
   + '</p>'
 
   // Canvas
@@ -704,10 +704,7 @@ function cropApriModal(id, slotW, slotH) {
   + '<div style="border:1px solid rgba(255,255,255,0.12);"></div><div style="border:1px solid rgba(255,255,255,0.12);"></div>'
   + '<div style="border:1px solid rgba(255,255,255,0.12);"></div>'
   + '</div>'
-  // Handle resize ↘
-  + '<div id="crop-handle" style="position:absolute;bottom:-7px;right:-7px;width:18px;height:18px;'
-  + 'background:#CFF09E;border-radius:50%;cursor:nwse-resize;z-index:10;'
-  + 'box-shadow:0 0 5px rgba(0,0,0,0.5);" title="Ridimensiona"></div>'
+  // Handle resize ↘ — rimosso, resize non supportato con object-fit
   + '</div>'
   + '</div>'
 
@@ -823,8 +820,7 @@ function cropModalAggiornaBox() {
 function cropModalBindDrag() {
  var canvas = document.getElementById('crop-canvas');
  var box    = document.getElementById('crop-box');
- var handle = document.getElementById('crop-handle');
- if (!canvas || !box || !handle) return;
+ if (!canvas || !box) return;
 
  function getRelPct(e) {
   var r = canvas.getBoundingClientRect();
@@ -839,50 +835,17 @@ function cropModalBindDrag() {
  function onBoxDown(e) {
   e.preventDefault(); e.stopPropagation();
   var p = getRelPct(e);
-  _cropModal.drag = { mode:'move', startX:p.x, startY:p.y, startCrop:{ x:_cropModal.crop.x, y:_cropModal.crop.y, w:_cropModal.crop.w, h:_cropModal.crop.h } };
+  _cropModal.drag = { startX:p.x, startY:p.y, startCrop:{ x:_cropModal.crop.x, y:_cropModal.crop.y, w:_cropModal.crop.w, h:_cropModal.crop.h } };
   box.style.cursor = 'grabbing';
- }
- function onHandleDown(e) {
-  e.preventDefault(); e.stopPropagation();
-  var p = getRelPct(e);
-  _cropModal.drag = { mode:'resize', startX:p.x, startY:p.y, startCrop:{ x:_cropModal.crop.x, y:_cropModal.crop.y, w:_cropModal.crop.w, h:_cropModal.crop.h } };
  }
  function onMove(e) {
   var d = _cropModal.drag;
   if (!d) return;
   e.preventDefault();
   var p = getRelPct(e);
-  var dx = p.x - d.startX;
-  var dy = p.y - d.startY;
   var sc = d.startCrop;
-  var slotAR = _cropModal.slotW / _cropModal.slotH;
-  var img = document.getElementById('crop-modal-img');
-  var imgDispAR = img ? (img.offsetWidth / (img.offsetHeight || 1)) : 1;
-
-  if (d.mode === 'move') {
-   var nx = Math.max(0, Math.min(100 - sc.w, sc.x + dx));
-   var ny = Math.max(0, Math.min(100 - sc.h, sc.y + dy));
-   _cropModal.crop.x = nx;
-   _cropModal.crop.y = ny;
-  } else if (d.mode === 'resize') {
-   // Mantieni l'aspect ratio della slot:
-   // cw (in % larghezza img) e ch (in % altezza img) devono soddisfare:
-   // cw_px / ch_px = slotW / slotH
-   // cw_px = cw/100 * dispW, ch_px = ch/100 * dispH
-   // → cw/ch = slotAR * (dispH/dispW)
-   var newW = Math.max(5, Math.min(100 - sc.x, sc.w + dx));
-   // Calcola ch corrispondente per mantenere aspect ratio della slot
-   var img2 = document.getElementById('crop-modal-img');
-   var dW = img2 ? (img2.offsetWidth || 1) : 1;
-   var dH = img2 ? (img2.offsetHeight || 1) : 1;
-   var newH = newW * (dW / dH) / slotAR;
-   newH = Math.max(5, Math.min(100 - sc.y, newH));
-   // Ricalcola w da h per consistency (evita drift)
-   newW = newH * slotAR * (dH / dW);
-   newW = Math.max(5, Math.min(100 - sc.x, newW));
-   _cropModal.crop.w = newW;
-   _cropModal.crop.h = newH;
-  }
+  _cropModal.crop.x = Math.max(0, Math.min(100 - sc.w, sc.x + (p.x - d.startX)));
+  _cropModal.crop.y = Math.max(0, Math.min(100 - sc.h, sc.y + (p.y - d.startY)));
   cropModalAggiornaBox();
  }
  function onUp() {
@@ -890,10 +853,8 @@ function cropModalBindDrag() {
   if (box) box.style.cursor = 'grab';
  }
 
- box.addEventListener('mousedown',    onBoxDown,    {passive:false});
- box.addEventListener('touchstart',   onBoxDown,    {passive:false});
- handle.addEventListener('mousedown',  onHandleDown, {passive:false});
- handle.addEventListener('touchstart', onHandleDown, {passive:false});
+ box.addEventListener('mousedown',   onBoxDown, {passive:false});
+ box.addEventListener('touchstart',  onBoxDown, {passive:false});
  document.addEventListener('mousemove',  onMove, {passive:false});
  document.addEventListener('touchmove',  onMove, {passive:false});
  document.addEventListener('mouseup',    onUp);
