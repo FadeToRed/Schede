@@ -621,7 +621,7 @@ function campoCropHTML(campoId, label, cropId, slotW, slotH) {
   + 'style="background:#292354; color:#CFF09E; border:1px solid #3B8686; '
   + 'padding:7px 14px; border-radius:6px; cursor:pointer; font-family:\'Montserrat\'; '
   + 'font-size:0.85em; display:flex; align-items:center; gap:8px; transition:border-color 0.2s;">'
-  + '<span style="font-size:1.1em;">✂️</span> Scegli inquadratura'
+  + '<i class="fa-solid fa-scissors"></i> Scegli inquadratura'
   + '<span class="crop-btn-thumb" style="display:none; width:40px; height:24px; '
   + 'border-radius:3px; border:1px solid #3B8686; background-size:cover; flex-shrink:0;"></span>'
   + '</button>';
@@ -671,8 +671,8 @@ function cropApriModal(id, slotW, slotH) {
   + 'display:flex;flex-direction:column;gap:16px;font-family:\'Montserrat\';">'
 
   // Header
-  + '<div style="display:flex;justify-content:space-between;align-items:center;">'
-  + '<span style="font-size:1.15em;font-weight:700;color:#CFF09E;">✂️ Scegli inquadratura</span>'
+  + '<div style="display:flex;justify-content:space-between;align-items:center;width:100%;">'
+  + '<span style="font-size:1.15em;font-weight:700;color:#CFF09E;"><i class="fa-solid fa-scissors"></i> Scegli inquadratura</span>'
   + '<button onclick="cropChiudiModal()" style="background:none;border:none;color:#8FBEBA;'
   + 'font-size:1.2em;cursor:pointer;padding:4px 8px;border-radius:4px;">✕</button>'
   + '</div>'
@@ -705,15 +705,6 @@ function cropApriModal(id, slotW, slotH) {
   + '<div style="border:1px solid rgba(255,255,255,0.12);"></div>'
   + '</div>'
   // Handle resize ↘ — rimosso, resize non supportato con object-fit
-  + '</div>'
-  + '</div>'
-
-  // Preview
-  + '<div style="display:flex;gap:20px;align-items:flex-start;">'
-  + '<div>'
-  + '<div style="font-size:0.72em;font-weight:700;color:#CFF09E;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Anteprima</div>'
-  + '<div id="crop-preview" style="width:80px;height:80px;border-radius:6px;border:1px solid #3B8686;'
-  + 'background:#111;background-repeat:no-repeat;"></div>'
   + '</div>'
   + '</div>'
 
@@ -792,29 +783,13 @@ function cropModalImgCaricata() {
 
 function cropModalAggiornaBox() {
  var box = document.getElementById('crop-box');
- var preview = document.getElementById('crop-preview');
  var img = document.getElementById('crop-modal-img');
  if (!box || !img) return;
  var c = _cropModal.crop;
- var dispW = img.offsetWidth || img.clientWidth || _cropModal.dispW || 1;
- var dispH = img.offsetHeight || img.clientHeight || _cropModal.dispH || 1;
-
  box.style.left   = c.x + '%';
  box.style.top    = c.y + '%';
  box.style.width  = c.w + '%';
  box.style.height = c.h + '%';
-
- // Aggiorna preview usando la stessa formula di avatarCropStyle
- if (preview) {
-  var bgSize = (100 / c.w * 100).toFixed(1) + '%';
-  var bgX = c.w < 100 ? ((c.x / (100 - c.w)) * 100).toFixed(1) : '0';
-  var bgY = c.h < 100 ? ((c.y / (100 - c.h)) * 100).toFixed(1) : '0';
-  var url = document.getElementById('crop-modal-img').src;
-  preview.style.backgroundImage = 'url('+url+')';
-  preview.style.backgroundSize = bgSize;
-  preview.style.backgroundPosition = bgX+'% '+bgY+'%';
-  preview.style.backgroundRepeat = 'no-repeat';
- }
 }
 
 function cropModalBindDrag() {
