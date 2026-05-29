@@ -1,4 +1,13 @@
-// AGGIORNA HTML SCHEDA (modalità "Mantieni attuale") 
+// ── Helper: genera inline style background-image per un crop x,y,w,h (%) ──
+function cropBgStyle(url, x, y, w, h) {
+ if (!url) return '';
+ var bgSize = (100 / w * 100).toFixed(2) + '%';
+ var bgX = w < 100 ? ((x / (100 - w)) * 100).toFixed(2) : '0';
+ var bgY = h < 100 ? ((y / (100 - h)) * 100).toFixed(2) : '0';
+ return 'background-image:url('+url+');background-size:'+bgSize+';background-position:'+bgX+'% '+bgY+'%;background-repeat:no-repeat;';
+}
+
+
 // Lavora sul DOM dell'originale importato: aggiorna solo i valori 
 // noti lasciando intatti tutti gli style/class inline dell'utente. 
 // ============================================================ 
@@ -26,33 +35,37 @@ function aggiornaHTMLScheda(d) {
  // Aggiorna innerHTML di un elemento trovato con querySelector 
  function setText(sel, val) { var el = qs(sel); if (el) el['inn'+'erHTML'] = val; } 
  // Aggiorna src (e opzionalmente object-position) di un img dentro un contenitore trovato con querySelector 
- function setImg(containerSel, src, pos) { 
-  var c = qs(containerSel); 
-  if (!c) return; 
-  var imgs = c[metodo]('img'); 
-  if (imgs.length > 0) { 
-   imgs[0].setAttribute('src', src); 
-   if (pos) imgs[0].style.objectPosition = pos; 
-  } 
- } 
- 
+ // Aggiorna background-image su un div figlio dentro il contenitore trovato con querySelector
+ function setImgDiv(containerSel, url, x, y, w, h) {
+  var c = qs(containerSel);
+  if (!c) return;
+  var divs = c[metodo]('div');
+  var target = divs.length > 0 ? divs[0] : c;
+  target.style.backgroundImage    = 'url('+url+')';
+  target.style.backgroundSize     = (100/w*100).toFixed(2)+'%';
+  target.style.backgroundPosition = (w<100?((x/(100-w))*100).toFixed(2):'0')+'% '+(h<100?((y/(100-h))*100).toFixed(2):'0')+'%';
+  target.style.backgroundRepeat   = 'no-repeat';
+ }
+
  // ── Nome / Cognome nel titolo ─────────────────────────────── 
  setText('.nomecognome', d.nomecognome); 
  
  // ── Immagini ─────────────────────────────────────────────── 
- setImg('.scheda-img',   d.imgLaterale, d.imgLateralePos||'center center'); 
- setImg('.img-dati',   d.imgDati, d.imgDatiPos||'center center'); 
+ setImgDiv('.scheda-img', d.imgLaterale, d.imgLateraleX||0, d.imgLateraleY||0, d.imgLateraleW||100, d.imgLateraleH||100);
+ setImgDiv('.img-dati',   d.imgDati,     d.imgDatiX||0,     d.imgDatiY||0,     d.imgDatiW||100,     d.imgDatiH||100);
  if (d.imgInfoModo === '2') { 
   var boxInfo = root.querySelector ? root['querySelector']('.img-info2') : null; 
   if (!boxInfo) { 
    var boxInfo1 = root.querySelector ? root['querySelector']('.img-info') : null; 
    if (boxInfo1) { boxInfo1.className = 'img-info2'; } 
    boxInfo = root.querySelector ? root['querySelector']('.img-info2') : null; 
-  } 
-  if (boxInfo) boxInfo['inn'+'erHTML'] = '<img src="'+d.imgInfoA+'" style="object-position:'+( d.imgInfoAPos||'center top' )+'"><br><img src="'+d.imgInfoB+'" style="object-position:'+( d.imgInfoBPos||'center top' )+'">'; 
+  }
+  if (boxInfo) boxInfo['inn'+'erHTML'] =
+   '<div style="width:100%;height:100%;'+cropBgStyle(d.imgInfoA,d.imgInfoAX||0,d.imgInfoAY||0,d.imgInfoAW||100,d.imgInfoAH||100)+'"></div><br>'
+   +'<div style="width:100%;height:100%;'+cropBgStyle(d.imgInfoB,d.imgInfoBX||0,d.imgInfoBY||0,d.imgInfoBW||100,d.imgInfoBH||100)+'"></div>';
  } else { 
   var boxInfo1b = root.querySelector ? root['querySelector']('.img-info,.img-info2') : null; 
-  if (boxInfo1b) { boxInfo1b.className = 'img-info'; boxInfo1b['inn'+'erHTML'] = '<img src="'+d.imgInfo+'" style="object-position:'+( d.imgInfoPos||'center top' )+'">'; } 
+  if (boxInfo1b) { boxInfo1b.className = 'img-info'; boxInfo1b['inn'+'erHTML'] = '<div style="width:100%;height:100%;'+cropBgStyle(d.imgInfo,d.imgInfoX||0,d.imgInfoY||0,d.imgInfoW||100,d.imgInfoH||100)+'"></div>'; }
  } 
  
  // ── Musica ───────────────────────────────────────────────── 
@@ -515,7 +528,7 @@ var htmlNen = '';
  
  return divApri + 
   '<div class="scheda-pg-container">' + 
-  '<div class="scheda-immagine"><div class="scheda-img"><img src="'+d.imgLaterale+'" style="object-position:'+( d.imgLateralePos||'center center' )+'"></div></div>' + 
+  '<div class="scheda-immagine"><div class="scheda-img"><div style="width:100%;height:100%;'+cropBgStyle(d.imgLaterale,d.imgLateraleX||0,d.imgLateraleY||0,d.imgLateraleW||100,d.imgLateraleH||100)+'"></div></div></div>' + 
   '<div class="scheda-nomecognome"><p align="center"><span class="container-nomecognome">' + 
   (d.musica ? '<button class="custom-player"><i class="fa-solid fa-circle-play"></i></button>' + htmlMusica : '') + 
   '<span class="nomecognome">'+d.nomecognome+'</span></span></p></div>' + 
@@ -530,7 +543,7 @@ var htmlNen = '';
   '<div class="slide-pg"><div class="slide-dati">' + 
   '<div class="dati-pg"><span>Classe:</span> <span>'+(d.classe !== '—' ? d.classe : 'N/D')+'</span> | <span>Status:</span> <span>'+d.status+'</span> | <span>Livello:</span> <span>'+d.livello+'</span></div>' + 
   '<div class="dati-exp-row"><span class="dati-pg2">Exp</span><div class="container-barra"><div class="barra-pg barra-exp" style="width:'+expPct+'%; height:100%;"></div></div><span class="dati-pg2"><b>'+d.exp+'/'+d.exptot+'</b> For Level Up!</span></div>' + 
-  '<div class="img-dati"><img src="'+d.imgDati+'" style="object-position:'+( d.imgDatiPos||'center center' )+'"></div>' + 
+  '<div class="img-dati"><div style="width:100%;height:100%;'+cropBgStyle(d.imgDati,d.imgDatiX||0,d.imgDatiY||0,d.imgDatiW||100,d.imgDatiH||100)+'"></div></div>' + 
   '<div class="div-dati">' + 
   '<span class="scheda-label">Nome:</span> <span class="scheda-entry">'+d.nome+'</span>\n' + 
   '<span class="scheda-label">Cognome:</span> <span class="scheda-entry">'+d.cognome+'</span>\n' + 
@@ -554,7 +567,7 @@ var htmlNen = '';
   '<div class="slide-pg"><div class="slide-info">' + 
   '<div class="info-aggettivi"><span class="aggettivo">'+d.agg1+'</span><span class="info-sep"></span><span class="aggettivo">'+d.agg2+'</span><span class="info-sep"></span><span class="aggettivo">'+d.agg3+'</span></div>' + 
   '<div class="info-citazione"><span>'+d.citazione+'</span></div>' + 
-  (d.imgInfoModo==='2' ? '<div class="img-info2"><img src="'+d.imgInfoA+'" style="object-position:'+( d.imgInfoAPos||'center top' )+'"><br><img src="'+d.imgInfoB+'" style="object-position:'+( d.imgInfoBPos||'center top' )+'"></div>' : '<div class="img-info"><img src="'+d.imgInfo+'" style="object-position:'+( d.imgInfoPos||'center top' )+'"></div>') + 
+  (d.imgInfoModo==='2' ? '<div class="img-info2"><div style="width:100%;height:100%;'+cropBgStyle(d.imgInfoA,d.imgInfoAX||0,d.imgInfoAY||0,d.imgInfoAW||100,d.imgInfoAH||100)+'"></div><br><div style="width:100%;height:100%;'+cropBgStyle(d.imgInfoB,d.imgInfoBX||0,d.imgInfoBY||0,d.imgInfoBW||100,d.imgInfoBH||100)+'"></div></div>' : '<div class="img-info"><div style="width:100%;height:100%;'+cropBgStyle(d.imgInfo,d.imgInfoX||0,d.imgInfoY||0,d.imgInfoW||100,d.imgInfoH||100)+'"></div></div>') + 
   '<div class="info-aspetto"><span class="scheda-label">Descrizione:</span> <span class="scheda-entry">'+d.aspetto+'</span></div>' + 
   '<div class="info-storia"><span class="scheda-label">Background:</span> <span class="scheda-entry">'+d.background+'</span></div>' + 
   '</div></div>' + 
