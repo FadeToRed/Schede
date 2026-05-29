@@ -608,7 +608,8 @@ function cropAggiornaBottone(id) {
 function campoCropHTML(campoId, label, cropId, slotW, slotH) {
  var MAP_CAMPO = {
   'img-laterale':'campo-img-laterale','img-dati':'campo-img-dati',
-  'img-info':'campo-img-info','img-info-a':'campo-img-info-a','img-info-b':'campo-img-info-b'
+  'img-info':'campo-img-info','img-info-a':'campo-img-info-a','img-info-b':'campo-img-info-b',
+  'img-nen':'nen-img'
  };
  var html = '<div style="margin-bottom:14px;">';
  html += '<label style="'+STILE_LABEL+'">'+label+'</label>';
@@ -640,7 +641,8 @@ function campoCropHTML(campoId, label, cropId, slotW, slotH) {
 function cropApriModal(id, slotW, slotH) {
  var MAP_CAMPO = {
   'img-laterale':'campo-img-laterale','img-dati':'campo-img-dati',
-  'img-info':'campo-img-info','img-info-a':'campo-img-info-a','img-info-b':'campo-img-info-b'
+  'img-info':'campo-img-info','img-info-a':'campo-img-info-a','img-info-b':'campo-img-info-b',
+  'img-nen':'nen-img'
  };
  var campoEl = document.getElementById(MAP_CAMPO[id]);
  var url = campoEl ? campoEl.value.trim() : '';
