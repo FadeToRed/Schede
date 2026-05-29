@@ -732,66 +732,76 @@ function cropApriModal(id, slotW, slotH) {
 }
 
 function cropModalImgCaricata() {
- var img = document.getElementById('crop-modal-img');
- var canvas = document.getElementById('crop-canvas');
- var box = document.getElementById('crop-box');
- var darken = document.getElementById('crop-darken');
- if (!img || !canvas || !box) return;
+ // Usa setTimeout per assicurarsi che il browser abbia fatto il layout
+ setTimeout(function() {
+  var img = document.getElementById('crop-modal-img');
+  var canvas = document.getElementById('crop-canvas');
+  var box = document.getElementById('crop-box');
+  var darken = document.getElementById('crop-darken');
+  if (!img || !canvas || !box) return;
 
- darken.style.display = '';
- box.style.display = '';
+  darken.style.display = '';
+  box.style.display = '';
 
- var natW = img.naturalWidth;
- var natH = img.naturalHeight;
- var dispW = img.offsetWidth || img.clientWidth;
- var dispH = img.offsetHeight || img.clientHeight;
- if (!dispW || !dispH) { dispW = img.width; dispH = img.height; }
+  var natW = img.naturalWidth;
+  var natH = img.naturalHeight;
+  if (!natW || !natH) return;
 
- var canvas3 = document.getElementById('crop-canvas');
- var canvW = canvas3 ? (canvas3.offsetWidth  || dispW) : dispW;
- var canvH = canvas3 ? (canvas3.offsetHeight || dispH) : dispH;
- // Offset dell'immagine dentro il canvas (object-fit:contain → bande laterali o verticali)
- var ox = (canvW - dispW) / 2;
- var oy = (canvH - dispH) / 2;
+  // Dimensioni reali del canvas
+  var canvW = canvas.offsetWidth  || 600;
+  var canvH = canvas.offsetHeight || 400;
 
- // Aspect ratio della slot
- var slotW = _cropModal.slotW;
- var slotH = _cropModal.slotH;
- var slotAR = slotW / slotH;
+  // Calcola le dimensioni dell'immagine scalata con object-fit:contain
+  // (width:100%, max-height:400px, height:auto)
+  var scaleW = canvW / natW;
+  var scaleH = 400  / natH; // max-height dell'img nel CSS del modal
+  var scale  = Math.min(scaleW, scaleH);
+  var dispW  = Math.round(natW * scale);
+  var dispH  = Math.round(natH * scale);
 
- var saved = _cropModal.crop;
- var cx, cy, cw, ch;
+  // Offset dell'immagine centrata nel canvas
+  var ox = (canvW - dispW) / 2;
+  var oy = (canvH - dispH) / 2;
 
- if (saved.w === 100 && saved.h === 100 && saved.x === 0 && saved.y === 0) {
-  // Prima volta: inizializza centrato rispettando l'aspect ratio della slot,
-  // in coordinate % del canvas.
-  var imgAR = dispW / dispH;
-  var rectPxW, rectPxH;
-  if (slotAR >= imgAR) {
-   rectPxW = dispW;
-   rectPxH = Math.min(dispH, rectPxW / slotAR);
+  var slotW  = _cropModal.slotW;
+  var slotH  = _cropModal.slotH;
+  var slotAR = slotW / slotH;
+  var saved  = _cropModal.crop;
+  var cx, cy, cw, ch;
+
+  if (saved.w === 100 && saved.h === 100 && saved.x === 0 && saved.y === 0) {
+   // Prima apertura: rettangolo centrato con l'aspect ratio della slot
+   var imgAR = dispW / dispH;
+   var rectPxW, rectPxH;
+   if (slotAR >= imgAR) {
+    rectPxW = dispW;
+    rectPxH = Math.min(dispH, rectPxW / slotAR);
+   } else {
+    rectPxH = dispH;
+    rectPxW = Math.min(dispW, rectPxH * slotAR);
+   }
+   cw = rectPxW / canvW * 100;
+   ch = rectPxH / canvH * 100;
+   cx = (ox + (dispW - rectPxW) / 2) / canvW * 100;
+   cy = (oy + (dispH - rectPxH) / 2) / canvH * 100;
   } else {
-   rectPxH = dispH;
-   rectPxW = Math.min(dispW, rectPxH * slotAR);
+   // Crop salvato in % immagine → converti in % canvas
+   cx = (ox + saved.x / 100 * dispW) / canvW * 100;
+   cy = (oy + saved.y / 100 * dispH) / canvH * 100;
+   cw = saved.w / 100 * dispW / canvW * 100;
+   ch = saved.h / 100 * dispH / canvH * 100;
   }
-  cw = rectPxW / canvW * 100;
-  ch = rectPxH / canvH * 100;
-  cx = (ox + (dispW - rectPxW) / 2) / canvW * 100;
-  cy = (oy + (dispH - rectPxH) / 2) / canvH * 100;
- } else {
-  // Crop salvato in % immagine → converti in % canvas
-  cx = (ox + saved.x / 100 * dispW) / canvW * 100;
-  cy = (oy + saved.y / 100 * dispH) / canvH * 100;
-  cw = saved.w / 100 * dispW / canvW * 100;
-  ch = saved.h / 100 * dispH / canvH * 100;
- }
 
- _cropModal.crop = { x: cx, y: cy, w: cw, h: ch };
- _cropModal.dispW = dispW;
- _cropModal.dispH = dispH;
- _cropModal.imgAR = natW / natH;
+  _cropModal.crop = { x: cx, y: cy, w: cw, h: ch };
+  _cropModal.dispW = dispW;
+  _cropModal.dispH = dispH;
+  _cropModal.canvW = canvW;
+  _cropModal.canvH = canvH;
+  _cropModal.ox    = ox;
+  _cropModal.oy    = oy;
 
- cropModalAggiornaBox();
+  cropModalAggiornaBox();
+ }, 0);
 }
 
 function cropModalAggiornaBox() {
@@ -833,27 +843,20 @@ function cropModalBindDrag() {
   var p = getRelPct(e);
   var sc = d.startCrop;
 
-  // Calcola i bounds reali dell'immagine dentro il canvas in % del canvas.
-  // L'img ha object-fit:contain → può avere bande vuote ai lati o sopra/sotto.
-  var img2 = document.getElementById('crop-modal-img');
-  var imgMinX = 0, imgMinY = 0, imgMaxX = 100, imgMaxY = 100;
-  if (img2) {
-   var cw2 = canvas.offsetWidth  || 1;
-   var ch2 = canvas.offsetHeight || 1;
-   var iw  = img2.offsetWidth    || cw2;
-   var ih  = img2.offsetHeight   || ch2;
-   // offset dell'immagine rispetto al canvas (centrata da object-fit:contain)
-   var ox = (cw2 - iw) / 2;
-   var oy = (ch2 - ih) / 2;
-   imgMinX = (ox / cw2) * 100;
-   imgMinY = (oy / ch2) * 100;
-   imgMaxX = ((ox + iw) / cw2) * 100;
-   imgMaxY = ((oy + ih) / ch2) * 100;
-  }
+  // Bounds dell'immagine nel canvas, calcolati una volta in cropModalImgCaricata
+  var canvW = _cropModal.canvW || canvas.offsetWidth  || 1;
+  var canvH = _cropModal.canvH || canvas.offsetHeight || 1;
+  var dispW = _cropModal.dispW || canvW;
+  var dispH = _cropModal.dispH || canvH;
+  var ox    = _cropModal.ox    != null ? _cropModal.ox : (canvW - dispW) / 2;
+  var oy    = _cropModal.oy    != null ? _cropModal.oy : (canvH - dispH) / 2;
+  var imgMinX = ox / canvW * 100;
+  var imgMinY = oy / canvH * 100;
+  var imgMaxX = (ox + dispW) / canvW * 100;
+  var imgMaxY = (oy + dispH) / canvH * 100;
 
   var newX = sc.x + (p.x - d.startX);
   var newY = sc.y + (p.y - d.startY);
-  // Clamp: il rettangolo non può uscire dall'area immagine
   _cropModal.crop.x = Math.max(imgMinX, Math.min(imgMaxX - sc.w, newX));
   _cropModal.crop.y = Math.max(imgMinY, Math.min(imgMaxY - sc.h, newY));
   cropModalAggiornaBox();
@@ -874,27 +877,21 @@ function cropModalBindDrag() {
 function cropConferma() {
  var c = _cropModal.crop;
  // Converti da coordinate % del canvas a coordinate % dell'immagine
- var img = document.getElementById('crop-modal-img');
- var canvas2 = document.getElementById('crop-canvas');
- var x = c.x, y = c.y, w = c.w, h = c.h;
- if (img && canvas2) {
-  var cw = canvas2.offsetWidth  || 1;
-  var ch = canvas2.offsetHeight || 1;
-  var iw = img.offsetWidth      || cw;
-  var ih = img.offsetHeight     || ch;
-  var ox = (cw - iw) / 2; // offset immagine nel canvas
-  var oy = (ch - ih) / 2;
-  // Converti: pct_canvas → px_canvas → px_img → pct_img
-  x = ((c.x / 100 * cw) - ox) / iw * 100;
-  y = ((c.y / 100 * ch) - oy) / ih * 100;
-  w = (c.w / 100 * cw) / iw * 100;
-  h = (c.h / 100 * ch) / ih * 100;
-  // Clamp per sicurezza
-  x = Math.max(0, Math.min(100 - w, x));
-  y = Math.max(0, Math.min(100 - h, y));
-  w = Math.min(100, w);
-  h = Math.min(100, h);
- }
+ var canvW = _cropModal.canvW || 1;
+ var canvH = _cropModal.canvH || 1;
+ var dispW = _cropModal.dispW || canvW;
+ var dispH = _cropModal.dispH || canvH;
+ var ox    = _cropModal.ox    != null ? _cropModal.ox : 0;
+ var oy    = _cropModal.oy    != null ? _cropModal.oy : 0;
+ // canvas% → px_canvas → px_img → img%
+ var x = ((c.x / 100 * canvW) - ox) / dispW * 100;
+ var y = ((c.y / 100 * canvH) - oy) / dispH * 100;
+ var w = (c.w / 100 * canvW) / dispW * 100;
+ var h = (c.h / 100 * canvH) / dispH * 100;
+ x = Math.max(0, Math.min(100 - w, x));
+ y = Math.max(0, Math.min(100 - h, y));
+ w = Math.min(100, w);
+ h = Math.min(100, h);
  cropScrivi(_cropModal.id, x, y, w, h);
  cropChiudiModal();
 }
