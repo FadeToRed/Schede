@@ -984,6 +984,7 @@ function costruisciStatusMultipli() {
 
 function aggiungiStatus() {
  var lista = document.getElementById('lista-status');
+ if (!lista) return;
  var idx = lista.children.length;
  var opzioni = STATUS.map(function(s){ return '<option value="'+s+'">'+s+'</option>'; }).join('');
  var div = document.createElement('div');
@@ -1660,6 +1661,7 @@ function costruisciQuest(isNuova) {
  
 function aggiungiQuest() { 
  var lista = document.getElementById('lista-quest'); 
+ if (!lista) return; 
  var idx = lista.children.length; 
  var div = document.createElement('div'); 
  div.id = 'quest-row-' + idx; 
@@ -1716,6 +1718,7 @@ function costruisciBalue(isNuova) {
  
 function aggiungiItem(categoria) { 
  var lista = document.getElementById('lista-' + categoria); 
+ if (!lista) return; 
  var idx = lista.children.length; 
  var div = document.createElement('div'); 
  div.id = categoria + '-row-' + idx; 
@@ -2183,6 +2186,9 @@ function motoreLevelUp(opts) {
 
  var vitaFin = vita + 100 * levelUps; 
  var auraFin = aura + 100 * levelUps; 
+ // Tetti: Vita max 3000, Aura max 5000 
+ if (vitaFin > 3000) vitaFin = 3000; 
+ if (auraFin > 5000) auraFin = 5000; 
  var tenaciaFin = applicaTenaciaLevel(tenacia, lvIniziale, livello, razza); 
 
  return { 
@@ -2595,20 +2601,23 @@ function importaScheda() {
  } 
  
  // ── Quest ─────────────────────────────────────────────────── 
- for (var i = 0; i < spans.length; i++) { 
-  if (spans[i].className === 'scheda-label' && spans[i].textContent.trim() === 'Quest:') { 
-   // Le quest sono span.scheda-entry consecutivi dopo il label 
-   for (var j = i + 1; j < spans.length; j++) { 
-    if (spans[j].className !== 'scheda-entry') break; // fine blocco quest 
-    var anchors = spans[j][metodo]('a'); 
-    for (var a = 0; a < anchors.length; a++) { 
-     aggiungiQuest(); 
-     var qIdx = document.getElementById('lista-quest').children.length - 1; 
-     setVal('quest-nome-' + qIdx, anchors[a].textContent.trim()); 
-     setVal('quest-link-' + qIdx, anchors[a].getAttribute('href') || ''); 
+ // Salta se il form non ha la sezione quest (es. modalità accrediti) 
+ if (document.getElementById('lista-quest')) { 
+  for (var i = 0; i < spans.length; i++) { 
+   if (spans[i].className === 'scheda-label' && spans[i].textContent.trim() === 'Quest:') { 
+    // Le quest sono span.scheda-entry consecutivi dopo il label 
+    for (var j = i + 1; j < spans.length; j++) { 
+     if (spans[j].className !== 'scheda-entry') break; // fine blocco quest 
+     var anchors = spans[j][metodo]('a'); 
+     for (var a = 0; a < anchors.length; a++) { 
+      aggiungiQuest(); 
+      var qIdx = document.getElementById('lista-quest').children.length - 1; 
+      setVal('quest-nome-' + qIdx, anchors[a].textContent.trim()); 
+      setVal('quest-link-' + qIdx, anchors[a].getAttribute('href') || ''); 
+     } 
     } 
+    break; 
    } 
-   break; 
   } 
  } 
  
@@ -2651,7 +2660,9 @@ function importaScheda() {
     var infoEl = items[li].querySelector ? items[li].querySelector('.equip-item-info') : null; 
     if (!nameEl) continue; 
     aggiungiItem(catId); 
-    var bIdx = document.getElementById('lista-' + catId).children.length - 1; 
+    var listaCat = document.getElementById('lista-' + catId); 
+    if (!listaCat) continue; 
+    var bIdx = listaCat.children.length - 1; 
     setVal(catId + '-nome-' + bIdx, nameEl.textContent.trim()); 
     if (infoEl) { 
      var infoTesto = infoEl.textContent; 
