@@ -523,6 +523,7 @@ function costruisciStatAccrediti() {
  html += '<i class="fa-solid fa-coins" style="color:#CFF09E;"></i> '; 
  html += '<span id="acc-punti-counter" style="color:#8FBEBA; font-size:0.95em; font-weight:600;">0 punti da distribuire</span>'; 
  html += '</div>'; 
+ html += '<p style="color:#8FBEBA; font-size:0.82em; margin-bottom:10px; font-style:italic;">Massimo 250 per statistica (400 se overlivellata). Puoi overlivellare al massimo 2 statistiche.</p>'; 
  // Le 10 stat: valore corrente (readonly, da import) + extra distribuiti 
  var r1 = [], r2 = []; 
  for (var i = 0; i < 10; i++) { 
@@ -535,7 +536,9 @@ function costruisciStatAccrediti() {
    '<div style="display:flex; justify-content:center; gap:4px; margin-top:5px;">' + 
    '<button onclick="accModificaStat(\''+ls[i]+'\',-5)" style="background:#0B486B; color:#CFF09E; border:1px solid #3B8686; border-radius:4px; width:24px; height:24px; cursor:pointer; font-size:0.9em; padding:0;">&#8722;</button>' + 
    '<button onclick="accModificaStat(\''+ls[i]+'\',5)"  style="background:#0B486B; color:#CFF09E; border:1px solid #3B8686; border-radius:4px; width:24px; height:24px; cursor:pointer; font-size:0.9em; padding:0;">+</button>' + 
-   '</div></div>'; 
+   '</div>' + 
+   '<label style="display:block; color:#8FBEBA; font-size:0.72em; margin-top:5px; cursor:pointer;"><input type="checkbox" id="over-'+ls[i]+'" onchange="accToggleOver(this,\''+ls[i]+'\')"> over</label>' + 
+   '</div>'; 
   if (i < 5) r1.push(cella); else r2.push(cella); 
  } 
  html += rigaStat5(r1); 
@@ -702,13 +705,52 @@ function accModificaStat(stat, delta) {
  if (!exEl || !baseEl || !dispEl) return; 
  var extra = parseInt(exEl.value) || 0; 
  var baseV = parseInt(baseEl.textContent) || 0; 
- // Non si scende sotto il valore importato; sopra non c'è tetto 
- // (i punti extra slegati dal level up sono permessi). 
+ // Tetto: 250, o 400 se la stat è overlivellata 
+ var ovEl = document.getElementById('over-'+stat); 
+ var tetto = (ovEl && ovEl.checked) ? 400 : 250; 
+ var nuovoVal = baseV + extra + delta; 
+ // Non si scende sotto il valore importato, non si supera il tetto 
  if (delta < 0 && extra + delta < 0) return; 
+ if (delta > 0 && nuovoVal > tetto) return; 
  extra += delta; 
  exEl.value = extra; 
  dispEl.textContent = baseV + extra; 
  accAggiornaContatore(); 
+} 
+
+// Overlivellamento in modalità accrediti: max 2 stat, alza il tetto a 400 
+function accToggleOver(checkbox, stat) { 
+ if (checkbox.checked) { 
+  var ls = ['forza','resistenza','velocita','riflessi','destrezza','mira','intelligenza','carisma','istinto','fortuna']; 
+  var attive = 0; 
+  for (var i = 0; i < ls.length; i++) { 
+   if (ls[i] === stat) continue; 
+   var ov = document.getElementById('over-'+ls[i]); 
+   if (ov && ov.checked) attive++; 
+  } 
+  if (attive >= 2) { 
+   checkbox.checked = false; 
+   alert('Puoi overlivellare al massimo 2 statistiche!'); 
+   return; 
+  } 
+ } else { 
+  // Disattivata: se il valore corrente supera 250, riportalo a 250 
+  var baseEl = document.getElementById('accstat-base-'+stat); 
+  var exEl   = document.getElementById('accstat-extra-'+stat); 
+  var dispEl = document.getElementById('accstat-'+stat); 
+  if (baseEl && exEl && dispEl) { 
+   var baseV = parseInt(baseEl.textContent) || 0; 
+   var tot = baseV + (parseInt(exEl.value) || 0); 
+   if (tot > 250) { 
+    // Riduce l'extra così che base+extra = 250 (senza scendere sotto 0) 
+    var nuovoExtra = 250 - baseV; 
+    if (nuovoExtra < 0) nuovoExtra = 0; 
+    exEl.value = nuovoExtra; 
+    dispEl.textContent = baseV + nuovoExtra; 
+    accAggiornaContatore(); 
+   } 
+  } 
+ } 
 } 
 
 function accTotDistribuito() { 
@@ -2819,6 +2861,9 @@ function accPopolaDopoImport() {
   if (baseEl) baseEl.textContent = val; 
   if (dispEl) dispEl.textContent = val; 
   if (exEl) exEl.value = '0'; 
+  // Pre-attiva la checkbox "over" se la stat importata supera 250 
+  var ovEl = document.getElementById('over-'+ls[i]); 
+  if (ovEl) ovEl.checked = (parseInt(val) > 250); 
  } 
  // Vita/Aura readonly 
  var vEl = document.getElementById('accstat-vita'); if (vEl) vEl.textContent = b.vita; 
@@ -2912,19 +2957,12 @@ function raccogliDatiAccrediti() {
  stat.vita = String(vita); 
  stat.aura = String(aura); 
 
+ // over: legge lo stato dalle checkbox del form (riflette le modifiche staffer) 
  var ovSt = []; 
- if (root) { 
-  var cards = root[metodo]('div'); 
-  var mapStatInv = { 'Forza':'forza','Resistenza':'resistenza','Velocità':'velocita','Riflessi':'riflessi','Destrezza':'destrezza','Mira':'mira','Intelligenza':'intelligenza','Carisma':'carisma','Istinto':'istinto','Fortuna':'fortuna' }; 
-  for (var c = 0; c < cards.length; c++) { 
-   if (cards[c].className === 'stat-card') { 
-    var l = cards[c].querySelector ? cards[c].querySelector('.stat-label') : null; 
-    if (l && l.className.indexOf('over') !== -1) { 
-     var sid = mapStatInv[l.textContent.trim().replace(' over','')]; 
-     if (sid) ovSt.push(sid); 
-    } 
-   } 
-  } 
+ var lsOv = ['forza','resistenza','velocita','riflessi','destrezza','mira','intelligenza','carisma','istinto','fortuna']; 
+ for (var oi = 0; oi < lsOv.length; oi++) { 
+  var ovc = document.getElementById('over-'+lsOv[oi]); 
+  if (ovc && ovc.checked) ovSt.push(lsOv[oi]); 
  } 
 
  // Jenny / HC: valore attuale (da accBase) + importo aggiunto 
