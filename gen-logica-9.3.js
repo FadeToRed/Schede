@@ -2863,7 +2863,18 @@ function accCatturaBase(temp) {
    for (var li2 = 0; li2 < lis.length; li2++) { 
     var nmEl = lis[li2].querySelector ? lis[li2].querySelector('.equip-item-name') : null; 
     var inEl = lis[li2].querySelector ? lis[li2].querySelector('.equip-item-info') : null; 
-    if (nmEl) bauleAtt[catId2].push({ nome: nmEl.textContent.trim(), info: inEl ? inEl.textContent.trim() : '' }); 
+    if (nmEl) { 
+     var infoTxt = inEl ? inEl.textContent.trim() : ''; 
+     var qtM = infoTxt.match(/Qt:\s*(\S+)/); 
+     var lvM = infoTxt.match(/Lv\.\s*(\S+)/); 
+     var usiM = infoTxt.match(/Usi:\s*(\S+)/); 
+     bauleAtt[catId2].push({ 
+      nome: nmEl.textContent.trim(), 
+      qt: qtM ? qtM[1] : '', 
+      lv: lvM ? lvM[1] : '', 
+      usi: usiM ? usiM[1] : '' 
+     }); 
+    } 
    } 
   } 
  } 
@@ -3478,23 +3489,47 @@ function accCalcolaDiff(b, d) {
   pushTxt('Classificazione Taglia', b.classTaglia, d.classTaglia);
   pushTxt('Valore Taglia', b.valTaglia, d.valTaglia);
  }
- // Baule: confronto per categoria (numero e nomi degli item)
+ // Baule: confronto per categoria — aggiunta, rimozione, modifica (qt/lv/usi)
  var cats = ['armi','equip','oggetti','materiali'];
  var catNomi = { armi:'Armi', equip:'Equipaggiamento', oggetti:'Oggetti Extra', materiali:'Materiali' };
+ function bauleDettagli(it) {
+  var parti = [];
+  if (it.qt !== undefined && it.qt !== '' && it.qt !== null) parti.push('Qt ' + it.qt);
+  if (it.lv !== undefined && it.lv !== '' && it.lv !== null && it.lv !== '0') parti.push('Lv ' + it.lv);
+  if (it.usi !== undefined && it.usi !== '' && it.usi !== null) parti.push('Usi ' + it.usi);
+  return parti.join(', ');
+ }
+ function bauleCampiDiversi(v, n) {
+  var qv = String(v.qt||''), qn = String(n.qt||'');
+  var lv2 = String(v.lv||''), ln = String(n.lv||'');
+  var uv = String(v.usi||''), un = String(n.usi||'');
+  if ((lv2==='0'||lv2==='') && (ln==='0'||ln==='')) { lv2=''; ln=''; }
+  return qv!==qn || lv2!==ln || uv!==un;
+ }
  for (var c = 0; c < cats.length; c++) {
-  var vecchi = (b.baule && b.baule[cats[c]]) ? b.baule[cats[c]].map(function(x){ return x.nome; }) : [];
-  var nuovi  = (d.baule && d.baule[cats[c]]) ? d.baule[cats[c]].map(function(x){ return x.nome; }) : [];
-  // Item aggiunti (presenti nei nuovi, non nei vecchi)
-  for (var n = 0; n < nuovi.length; n++) {
-   var count_v = 0, count_n = 0;
-   for (var z = 0; z < vecchi.length; z++) if (vecchi[z] === nuovi[n]) count_v++;
-   for (var z2 = 0; z2 < nuovi.length; z2++) if (nuovi[z2] === nuovi[n]) count_n++;
-   // Segnala solo se ce ne sono più di prima e non già segnalato
-   var giaSegnalato = false;
-   for (var m = 0; m < mod.length; m++) if (mod[m].campo === catNomi[cats[c]] && mod[m].a === nuovi[n]) giaSegnalato = true;
-   if (count_n > count_v && !giaSegnalato) {
-    mod.push({ campo: catNomi[cats[c]], da: null, a: nuovi[n], delta: '+1' });
+  var listaV = (b.baule && b.baule[cats[c]]) ? b.baule[cats[c]] : [];
+  var listaN = (d.baule && d.baule[cats[c]]) ? d.baule[cats[c]] : [];
+  var etichetta = catNomi[cats[c]];
+  var usatiV = {};
+  // 1) Nuovi: aggiunte e modifiche
+  for (var ni = 0; ni < listaN.length; ni++) {
+   var itn = listaN[ni];
+   var itv = null, idxV = -1;
+   for (var kv = 0; kv < listaV.length; kv++) { if (listaV[kv].nome === itn.nome && !usatiV[kv]) { itv = listaV[kv]; idxV = kv; break; } }
+   if (!itv) {
+    mod.push({ campo: etichetta, da: null, a: itn.nome + (bauleDettagli(itn) ? ' (' + bauleDettagli(itn) + ')' : ''), delta: '+1' });
+   } else {
+    usatiV[idxV] = true;
+    if (bauleCampiDiversi(itv, itn)) {
+     mod.push({ campo: etichetta + ' — ' + itn.nome, da: bauleDettagli(itv) || '—', a: bauleDettagli(itn) || '—', delta: null });
+    }
    }
+  }
+  // 2) Vecchi non abbinati: rimozioni
+  for (var vi = 0; vi < listaV.length; vi++) {
+   if (usatiV[vi]) continue;
+   var itv2 = listaV[vi];
+   mod.push({ campo: etichetta, da: itv2.nome + (bauleDettagli(itv2) ? ' (' + bauleDettagli(itv2) + ')' : ''), a: null, delta: '-1' });
   }
  }
  return mod;
