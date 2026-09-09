@@ -61,15 +61,17 @@ function aggiornaCampiTaglia(root, metodo, d) {
    var lblFedina = trovaLabelSpan('Fedina Penale:'); 
    if (!lblFedina) return; 
    var entryFedina = entrySuccessivo(lblFedina); 
-   var ref = entryFedina ? entryFedina.nextSibling : lblFedina.nextSibling; 
    var parent = lblFedina.parentNode; 
-   // Costruisce i due campi come frammento: label + spazio + entry + \n 
+   // ref = il nodo "\n" che sta tra la fedina e Soldi. Inseriamo i campi 
+   // PRIMA di quel "\n", e ogni campo porta il proprio "\n" davanti a sé. 
+   // Risultato: Fedina \n Class \n Valore \n Soldi — un solo \n ovunque. 
+   var ref = entryFedina ? entryFedina.nextSibling : lblFedina.nextSibling; 
    function creaCampo(labelTesto, valore) { 
+    parent.insertBefore(document.createTextNode('\n'), ref); 
     var l = document.createElement('span'); l.className = 'scheda-label'; l.textContent = labelTesto; 
     var sp = document.createTextNode(' '); 
     var e = document.createElement('span'); e.className = 'scheda-entry'; e['inn'+'erHTML'] = valore; 
-    var nl = document.createTextNode('\n'); 
-    parent.insertBefore(l, ref); parent.insertBefore(sp, ref); parent.insertBefore(e, ref); parent.insertBefore(nl, ref); 
+    parent.insertBefore(l, ref); parent.insertBefore(sp, ref); parent.insertBefore(e, ref); 
    } 
    creaCampo('Classificazione Taglia:', d.classTaglia); 
    creaCampo('Valore Taglia:', d.valTaglia + ' Jenny'); 
