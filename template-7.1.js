@@ -565,7 +565,8 @@ function accMostraConferma(diff) {
   var m = diff[i]; 
   html += '<div style="color:#E2F7C4; font-size:0.92em; padding:3px 0;">'; 
   html += '<b style="color:#CFF09E;">' + m.campo + ':</b> '; 
-  if (m.da === null) { html += 'aggiunto <b>' + m.a + '</b>'; } 
+  if (m.delta === 'info') { html += '<b>' + m.a + '</b>'; } 
+  else if (m.da === null) { html += 'aggiunto <b>' + m.a + '</b>'; } 
   else { html += m.da + ' <i class="fa-solid fa-arrow-right" style="color:#8FBEBA; font-size:0.85em;"></i> <b>' + m.a + '</b>'; if (m.delta) html += ' <span style="color:#A8DBA8;">(' + m.delta + ')</span>'; } 
   html += '</div>'; 
  } 
