@@ -3451,6 +3451,9 @@ function accCalcolaDiff(b, d) {
  function pushTxt(campo, da, a) {
   if ((da||'') !== (a||'')) mod.push({ campo: campo, da: da||'—', a: a||'—', delta: null });
  }
+ // EXP totale accreditata (valore puro inserito dallo staffer), come prima voce
+ var expTot = parseInt((document.getElementById('acc-exp-delta')||{}).value) || 0;
+ if (expTot > 0) mod.push({ campo: 'EXP totale accreditata', da: null, a: String(expTot), delta: 'info' });
  pushNum('Livello', b.livello, d.livello);
  pushNum('EXP', b.exp, d.exp);
  pushNum('Jenny', b.jenny, d.jenny);
