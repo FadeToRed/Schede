@@ -1,7 +1,7 @@
 // ============================================================ 
 // COSTANTI DI CONFIGURAZIONE 
 // ============================================================ 
-var LIVELLO_INIZIALE = 1; 
+var LIVELLO_INIZIALE = 0; 
 var EXP_INIZIALE = 0; 
 var EXP_MASSIMA = 100; 
 var JENNY_INIZIALI = 10000; 
@@ -1683,9 +1683,81 @@ function toggleOver(checkbox, sId) {
 } 
  
 function calcolaExpTot(livello) { 
- var lv = parseInt(livello) || 1; 
+ var lv = parseInt(livello); 
+ if (isNaN(lv)) lv = 0; 
  if (lv <= 14) return 100; 
  return 100 + (lv - 14) * 10; 
+} 
+
+// ============================================================ 
+// MOTORE LEVEL-UP (accrediti) 
+// Regole confermate: 
+// - Ogni level-up: +100 Vita, +100 Aura, +25/30/35 punti stat (razza) 
+// - Tenacia: Umano +5% ogni livello; Bestie/Formichimere +5% solo sui 
+//   livelli PARI raggiunti. Tetto 100%. 
+// - Soglia EXP: 100 fino al Lv.14, poi +10 per livello. 
+// ============================================================ 
+function puntiPerLevel(razza, specie) { 
+ if (razza === 'Bestia Demoniaca') { 
+  if (specie === 'Formichimera Umana') return 35; 
+  return 30; 
+ } 
+ return 25; // Umano 
+} 
+
+function applicaTenaciaLevel(tenaciaCorrente, lvDa, lvA, razza) { 
+ var t = tenaciaCorrente; 
+ var soloPari = (razza === 'Bestia Demoniaca'); // include Formichimere (sono Bestie) 
+ for (var lv = lvDa + 1; lv <= lvA; lv++) { 
+  if (soloPari) { 
+   if (lv % 2 === 0) t += 5; 
+  } else { 
+   t += 5; 
+  } 
+  if (t >= 100) { t = 100; break; } 
+ } 
+ return t; 
+} 
+
+function motoreLevelUp(opts) { 
+ var livello = parseInt(opts.livello); if (isNaN(livello)) livello = 0; 
+ var exp     = parseInt(opts.exp);      if (isNaN(exp)) exp = 0; 
+ var expAccr = parseInt(opts.expAccreditata) || 0; 
+ var vita    = parseInt(opts.vita) || 300; 
+ var aura    = parseInt(opts.aura) || 500; 
+ var tenacia = parseInt(opts.tenacia); if (isNaN(tenacia)) tenacia = 10; 
+ var razza   = opts.razza || 'Umano'; 
+ var specie  = opts.specie || ''; 
+
+ var lvIniziale = livello; 
+ var expTot = exp + expAccr; 
+ var levelUps = 0; 
+ var puntiTot = 0; 
+
+ var soglia = calcolaExpTot(livello); 
+ // Guardia anti-loop: max 500 level-up per singolo accredito 
+ var guardia = 0; 
+ while (expTot >= soglia && guardia < 500) { 
+  expTot -= soglia; 
+  livello += 1; 
+  levelUps += 1; 
+  puntiTot += puntiPerLevel(razza, specie); 
+  soglia = calcolaExpTot(livello); 
+  guardia++; 
+ } 
+
+ var vitaFin = vita + 100 * levelUps; 
+ var auraFin = aura + 100 * levelUps; 
+ var tenaciaFin = applicaTenaciaLevel(tenacia, lvIniziale, livello, razza); 
+
+ return { 
+  livelloDa: lvIniziale, livelloA: livello, levelUps: levelUps, 
+  expResidua: expTot, expTotProssima: soglia, 
+  vitaDa: vita, vitaA: vitaFin, deltaVita: vitaFin - vita, 
+  auraDa: aura, auraA: auraFin, deltaAura: auraFin - aura, 
+  tenaciaDa: tenacia, tenaciaA: tenaciaFin, 
+  puntiDaDistribuire: puntiTot 
+ }; 
 } 
  
 function aggiornaCompetenze() { 
@@ -2389,9 +2461,9 @@ function raccogliDati(isNuova) {
    }
    return valori.length > 0 ? valori.join(' | ') : 'Nessuno';
   })(), 
-  livello: isNuova ? LIVELLO_INIZIALE : (val('campo-livello')||'1'), 
+  livello: isNuova ? LIVELLO_INIZIALE : (val('campo-livello')||'0'), 
   exp: isNuova ? EXP_INIZIALE : (val('campo-exp')||'0'), 
-  exptot: isNuova ? EXP_MASSIMA : calcolaExpTot(val('campo-livello')||'1'), 
+  exptot: isNuova ? EXP_MASSIMA : calcolaExpTot(val('campo-livello')||'0'), 
   jenny: isNuova ? JENNY_INIZIALI : (val('campo-jenny')||'0'), 
   hc: isNuova ? HC_INIZIALI : (val('campo-hc')||'0'), 
   imgLaterale: val('campo-img-laterale')||'https://via.placeholder.com/664x184',
