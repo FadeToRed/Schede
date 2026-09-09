@@ -583,6 +583,35 @@ function accAggiornaTotali() {
  if (ht) ht.textContent = (hAtt + hAdd).toLocaleString(); 
 } 
 
+// Gestione fedina/taglia in modalità accrediti (non dipende da campo-razza) 
+function accAggiornaFedina() { 
+ var feEl = document.getElementById('campo-fedina'); 
+ var tagliaWrap = document.getElementById('campo-taglia-wrap'); 
+ if (!feEl || !tagliaWrap) return; 
+ var b = stato.accBase || {}; 
+ var isBestia = b.razza === 'Bestia Demoniaca'; 
+ var isBestiaABC = isBestia && DATI_SPECIE[b.specie] && ['A','B','C'].indexOf(DATI_SPECIE[b.specie].rank) !== -1; 
+ // Bestie A/B/C: sempre Ricercato con taglia E forzata 
+ if (isBestiaABC) { feEl.value = 'Ricercato'; feEl.disabled = true; } 
+ else { feEl.disabled = false; } 
+ tagliaWrap.style.display = feEl.value === 'Ricercato' ? '' : 'none'; 
+ // Tipo di select taglia: readonly E per bestie A/B/C, select D+ per gli altri 
+ var ctSelect   = document.getElementById('campo-classtaglia'); 
+ var ctReadonly = document.getElementById('campo-classtaglia-readonly'); 
+ var vtEl       = document.getElementById('campo-valtaglia'); 
+ if (ctSelect) { 
+  if (isBestiaABC) { 
+   ctSelect.style.display = 'none'; 
+   if (ctReadonly) ctReadonly.style.display = ''; 
+   ctSelect.value = 'E'; 
+   if (vtEl && !vtEl.value) vtEl.value = VALORE_TAGLIA_BASE['E'].toLocaleString(); 
+  } else { 
+   ctSelect.style.display = ''; 
+   if (ctReadonly) ctReadonly.style.display = 'none'; 
+  } 
+ } 
+} 
+
 function costruisciStatusTaglia() { 
  var opzioni = STATUS.map(function(s){ return '<option value="'+s+'">'+s+'</option>'; }).join(''); 
  var html = ''; 
@@ -596,7 +625,7 @@ function costruisciStatusTaglia() {
  html += '</div>'; 
  // Fedina + Taglia 
  html += '<div id="campo-fedina-wrap" style="margin-bottom:14px;"><label style="'+STILE_LABEL+'">Fedina Penale</label>' + 
-  '<select id="campo-fedina" onchange="aggiornaFedina(false)" style="'+STILE_INPUT+' background:#292354;">' + 
+  '<select id="campo-fedina" onchange="accAggiornaFedina()" style="'+STILE_INPUT+' background:#292354;">' + 
   '<option value="Incensurato">Incensurato</option>' + 
   '<option value="Ricercato">Ricercato</option>' + 
   '</select></div>'; 
@@ -2760,7 +2789,10 @@ function accCatturaBase(temp) {
  stato.accBase = { 
   livello: livello, exp: exp, vita: vita, aura: aura, tenacia: tenacia, 
   razza: razza, specie: specie, stat: statVal, 
-  jenny: jenny, hc: hc, nen: nen 
+  jenny: jenny, hc: hc, nen: nen, 
+  fedina: entryDopoLabel('Fedina Penale:') || 'Incensurato', 
+  classTaglia: entryDopoLabel('Classificazione Taglia:') || 'E', 
+  valTaglia: (entryDopoLabel('Valore Taglia:') || '').replace(/\s*Jenny/i,'').trim() 
  }; 
 } 
 
@@ -2799,6 +2831,16 @@ function accPopolaDopoImport() {
  accAggiornaTotali(); 
  // Nen: precompila col valore attuale 
  var nenEl = document.getElementById('acc-nen'); if (nenEl) nenEl.value = (b.nen != null ? b.nen : 0); 
+ // Fedina / Taglia: riflette lo stato attuale del PG 
+ var feEl = document.getElementById('campo-fedina'); 
+ if (feEl) feEl.value = (b.fedina === 'Ricercato') ? 'Ricercato' : 'Incensurato'; 
+ var ctEl = document.getElementById('campo-classtaglia'); 
+ if (ctEl && b.classTaglia && b.classTaglia !== 'E') { 
+  for (var ci = 0; ci < ctEl.options.length; ci++) { if (ctEl.options[ci].value === b.classTaglia) { ctEl.selectedIndex = ci; break; } } 
+ } 
+ var vtEl = document.getElementById('campo-valtaglia'); 
+ if (vtEl && b.valTaglia) vtEl.value = b.valTaglia; 
+ if (typeof accAggiornaFedina === 'function') accAggiornaFedina(); 
  accAggiornaContatore(); 
 } 
  
