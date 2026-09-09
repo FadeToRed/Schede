@@ -16,6 +16,71 @@ function cropImg(url, x, y, w, h, cls) {
 }
 
 
+// Inserisce/aggiorna/rimuove i campi "Classificazione Taglia" e "Valore 
+// Taglia" nel DOM in base alla fedina. Necessario in modalità "mantieni": 
+// setEntry aggiorna solo campi già esistenti, mentre qui i campi taglia 
+// possono comparire o sparire al variare della fedina. 
+function aggiornaCampiTaglia(root, metodo, d) { 
+ function trovaLabelSpan(testo) { 
+  var spans = root[metodo]('span'); 
+  for (var i = 0; i < spans.length; i++) { 
+   if (spans[i].className === 'scheda-label' && spans[i].textContent.trim() === testo) return spans[i]; 
+  } 
+  return null; 
+ } 
+ function entrySuccessivo(labelSpan) { 
+  var n = labelSpan.nextSibling; 
+  while (n && !(n.nodeType === 1 && n.className === 'scheda-entry')) n = n.nextSibling; 
+  return n; 
+ } 
+ // Rimuove label + entry + eventuale nodo testo (\n) associato 
+ function rimuoviCampo(labelSpan) { 
+  if (!labelSpan) return; 
+  var entry = entrySuccessivo(labelSpan); 
+  var parent = labelSpan.parentNode; 
+  // Rimuove i nodi testo tra label ed entry e dopo entry fino al prossimo elemento 
+  var nodo = labelSpan.nextSibling; 
+  while (nodo && nodo !== entry) { var succ = nodo.nextSibling; if (nodo.nodeType === 3) parent.removeChild(nodo); nodo = succ; } 
+  if (entry) { 
+   var dopo = entry.nextSibling; 
+   if (dopo && dopo.nodeType === 3 && /^\s*$/.test(dopo.textContent)) parent.removeChild(dopo); 
+   parent.removeChild(entry); 
+  } 
+  parent.removeChild(labelSpan); 
+ } 
+
+ var lblClass = trovaLabelSpan('Classificazione Taglia:'); 
+ var lblVal   = trovaLabelSpan('Valore Taglia:'); 
+
+ if (d.fedina === 'Ricercato') { 
+  // Aggiorna se esistono, altrimenti inserisci dopo "Fedina Penale:" 
+  if (lblClass && lblVal) { 
+   var eC = entrySuccessivo(lblClass); if (eC) eC['inn'+'erHTML'] = d.classTaglia; 
+   var eV = entrySuccessivo(lblVal);   if (eV) eV['inn'+'erHTML'] = d.valTaglia + ' Jenny'; 
+  } else { 
+   var lblFedina = trovaLabelSpan('Fedina Penale:'); 
+   if (!lblFedina) return; 
+   var entryFedina = entrySuccessivo(lblFedina); 
+   var ref = entryFedina ? entryFedina.nextSibling : lblFedina.nextSibling; 
+   var parent = lblFedina.parentNode; 
+   // Costruisce i due campi come frammento: label + spazio + entry + \n 
+   function creaCampo(labelTesto, valore) { 
+    var l = document.createElement('span'); l.className = 'scheda-label'; l.textContent = labelTesto; 
+    var sp = document.createTextNode(' '); 
+    var e = document.createElement('span'); e.className = 'scheda-entry'; e['inn'+'erHTML'] = valore; 
+    var nl = document.createTextNode('\n'); 
+    parent.insertBefore(l, ref); parent.insertBefore(sp, ref); parent.insertBefore(e, ref); parent.insertBefore(nl, ref); 
+   } 
+   creaCampo('Classificazione Taglia:', d.classTaglia); 
+   creaCampo('Valore Taglia:', d.valTaglia + ' Jenny'); 
+  } 
+ } else { 
+  // Incensurato: rimuovi i campi taglia se presenti 
+  rimuoviCampo(lblVal); 
+  rimuoviCampo(lblClass); 
+ } 
+} 
+
 // Lavora sul DOM dell'originale importato: aggiorna solo i valori 
 // noti lasciando intatti tutti gli style/class inline dell'utente. 
 // ============================================================ 
@@ -142,10 +207,11 @@ function aggiornaHTMLScheda(d) {
  setEntry('Allineamento:',          d.allineamento); 
  setEntry('Mestiere:',              d.mestiere); 
  setEntry('Fedina Penale:',         d.fedina); 
- if (d.fedina === 'Ricercato') { 
-  setEntry('Classificazione Taglia:', d.classTaglia); 
-  setEntry('Valore Taglia:',          d.valTaglia + ' Jenny'); 
- } 
+ // ── Taglia: inserisce, aggiorna o rimuove i campi in base alla fedina ── 
+ // In modalità "mantieni" i campi taglia potrebbero non esistere (PG prima 
+ // Incensurato) o esistere quando non servono più (tornato Incensurato). 
+ // setEntry aggiorna solo campi già presenti, quindi qui li gestiamo a mano. 
+ aggiornaCampiTaglia(root, metodo, d); 
  setEntry('Soldi:', d.jenny.toLocaleString() + ' Jenny / ' + d.hc + ' HC'); 
  
  // ── Quest ─────────────────────────────────────────────────── 
