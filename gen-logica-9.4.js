@@ -553,18 +553,25 @@ function costruisciStatAccrediti() {
 
 function costruisciValoriDiretti() { 
  var html = ''; 
- // Jenny: valore attuale (readonly) + importo da aggiungere 
+ var stileSel = STILE_INPUT + ' background:#292354;'; 
+ // Jenny: valore attuale (readonly) + operazione (aggiungi/sottrai) + importo 
  html += '<div style="margin-bottom:14px;"><label style="'+STILE_LABEL+'">Jenny attuali</label>' + 
   '<div id="acc-jenny-attuale" style="'+STILE_READONLY+'">—</div></div>'; 
- html += riga2( 
-  '<div style="margin-bottom:14px;"><label style="'+STILE_LABEL+'">Jenny da aggiungere</label><input type="number" id="acc-jenny-add" min="0" step="1" value="0" oninput="accAggiornaTotali()" style="'+STILE_INPUT+'"></div>', 
+ html += riga3( 
+  '<div style="margin-bottom:14px;"><label style="'+STILE_LABEL+'">Operazione</label>' + 
+   '<select id="acc-jenny-op" onchange="accAggiornaTotali()" style="'+stileSel+'">' + 
+   '<option value="add">+ Aggiungi</option><option value="sub">&#8722; Sottrai</option></select></div>', 
+  '<div style="margin-bottom:14px;"><label style="'+STILE_LABEL+'">Importo Jenny</label><input type="number" id="acc-jenny-add" min="0" step="1" value="0" oninput="accAggiornaTotali()" style="'+STILE_INPUT+'"></div>', 
   '<div style="margin-bottom:14px;"><label style="'+STILE_LABEL+'">Jenny risultanti</label><div id="acc-jenny-tot" style="'+STILE_READONLY+'">—</div></div>' 
  ); 
  // HC: stesso schema 
  html += '<div style="margin-bottom:14px;"><label style="'+STILE_LABEL+'">HC attuali</label>' + 
   '<div id="acc-hc-attuale" style="'+STILE_READONLY+'">—</div></div>'; 
- html += riga2( 
-  '<div style="margin-bottom:14px;"><label style="'+STILE_LABEL+'">HC da aggiungere</label><input type="number" id="acc-hc-add" min="0" step="1" value="0" oninput="accAggiornaTotali()" style="'+STILE_INPUT+'"></div>', 
+ html += riga3( 
+  '<div style="margin-bottom:14px;"><label style="'+STILE_LABEL+'">Operazione</label>' + 
+   '<select id="acc-hc-op" onchange="accAggiornaTotali()" style="'+stileSel+'">' + 
+   '<option value="add">+ Aggiungi</option><option value="sub">&#8722; Sottrai</option></select></div>', 
+  '<div style="margin-bottom:14px;"><label style="'+STILE_LABEL+'">Importo HC</label><input type="number" id="acc-hc-add" min="0" step="1" value="0" oninput="accAggiornaTotali()" style="'+STILE_INPUT+'"></div>', 
   '<div style="margin-bottom:14px;"><label style="'+STILE_LABEL+'">HC risultanti</label><div id="acc-hc-tot" style="'+STILE_READONLY+'">—</div></div>' 
  ); 
  // Nen: campo modificabile precompilato col valore attuale 
@@ -573,17 +580,27 @@ function costruisciValoriDiretti() {
  return html; 
 } 
 
-// Aggiorna i totali risultanti Jenny/HC (attuale + aggiunta) 
+// Restituisce l'importo firmato (positivo per aggiungi, negativo per sottrai) 
+function accImportoFirmato(idImporto, idOp) { 
+ var imp = parseInt((document.getElementById(idImporto)||{}).value) || 0; 
+ if (imp < 0) imp = 0; // il campo è sempre positivo; il segno lo dà l'operazione 
+ var opEl = document.getElementById(idOp); 
+ var op = opEl ? opEl.value : 'add'; 
+ return op === 'sub' ? -imp : imp; 
+} 
+
+// Aggiorna i totali risultanti Jenny/HC (attuale +/- importo secondo operazione) 
 function accAggiornaTotali() { 
  var b = stato.accBase || {}; 
  var jAtt = b.jenny != null ? b.jenny : 0; 
  var hAtt = b.hc != null ? b.hc : 0; 
- var jAdd = parseInt((document.getElementById('acc-jenny-add')||{}).value) || 0; 
- var hAdd = parseInt((document.getElementById('acc-hc-add')||{}).value) || 0; 
+ var jDelta = accImportoFirmato('acc-jenny-add', 'acc-jenny-op'); 
+ var hDelta = accImportoFirmato('acc-hc-add', 'acc-hc-op'); 
  var jt = document.getElementById('acc-jenny-tot'); 
  var ht = document.getElementById('acc-hc-tot'); 
- if (jt) jt.textContent = (jAtt + jAdd).toLocaleString(); 
- if (ht) ht.textContent = (hAtt + hAdd).toLocaleString(); 
+ // Il saldo può andare in negativo (indebitamento consentito) 
+ if (jt) jt.textContent = (jAtt + jDelta).toLocaleString(); 
+ if (ht) ht.textContent = (hAtt + hDelta).toLocaleString(); 
 } 
 
 // Gestione fedina/taglia in modalità accrediti (non dipende da campo-razza) 
@@ -2925,6 +2942,8 @@ function accPopolaDopoImport() {
  var hAtt = document.getElementById('acc-hc-attuale');    if (hAtt) hAtt.textContent = (b.hc||0) + ' HC'; 
  var jAdd = document.getElementById('acc-jenny-add'); if (jAdd) jAdd.value = '0'; 
  var hAdd = document.getElementById('acc-hc-add');    if (hAdd) hAdd.value = '0'; 
+ var jOp = document.getElementById('acc-jenny-op'); if (jOp) jOp.value = 'add'; 
+ var hOp = document.getElementById('acc-hc-op');    if (hOp) hOp.value = 'add'; 
  accAggiornaTotali(); 
  // Nen: precompila col valore attuale 
  var nenEl = document.getElementById('acc-nen'); if (nenEl) nenEl.value = (b.nen != null ? b.nen : 0); 
@@ -3017,13 +3036,13 @@ function raccogliDatiAccrediti() {
   if (ovc && ovc.checked) ovSt.push(lsOv[oi]); 
  } 
 
- // Jenny / HC: valore attuale (da accBase) + importo aggiunto 
+ // Jenny / HC: valore attuale (da accBase) +/- importo secondo operazione 
  var jAtt = b.jenny != null ? b.jenny : 0; 
  var hAtt = b.hc != null ? b.hc : 0; 
- var jAdd = parseInt((document.getElementById('acc-jenny-add')||{}).value) || 0; 
- var hAdd = parseInt((document.getElementById('acc-hc-add')||{}).value) || 0; 
- var jenny = jAtt + jAdd; 
- var hc = String(hAtt + hAdd); 
+ var jDelta = accImportoFirmato('acc-jenny-add', 'acc-jenny-op'); 
+ var hDelta = accImportoFirmato('acc-hc-add', 'acc-hc-op'); 
+ var jenny = jAtt + jDelta; 
+ var hc = String(hAtt + hDelta); 
 
  var nenEl = document.getElementById('acc-nen'); 
  var nen = (nenEl && nenEl.value.trim() !== '') ? (parseInt(nenEl.value) || 0) : (b.nen != null ? b.nen : 0); 
@@ -3466,7 +3485,7 @@ function accCalcolaDiff(b, d) {
  var expTot = parseInt((document.getElementById('acc-exp-delta')||{}).value) || 0;
  if (expTot > 0) mod.push({ campo: 'EXP totale accreditata', da: null, a: String(expTot), delta: 'info' });
  pushNum('Livello', b.livello, d.livello);
- pushNum('EXP', b.exp, d.exp);
+ pushNum('EXP residua', b.exp, d.exp);
  pushNum('Jenny', b.jenny, d.jenny);
  pushNum('HC', b.hc, d.hc);
  pushNum('Nen', b.nen, d.nen);
