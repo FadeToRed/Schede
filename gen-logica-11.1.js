@@ -136,8 +136,18 @@ var stato = {
 // nen) l'utente ha aggiunto, così al ripristino vengono ricreate 
 // prima di reinserire i valori. 
 // Le immagini (crop) restano ESCLUSE: pesano troppo per localStorage. 
+// 
+// Ogni modalità ha la SUA chiave: "nuova" e "modifica" non si 
+// cancellano a vicenda. La modalità "accrediti" NON viene mai 
+// salvata (ritorna null): un accredito è un'operazione one-shot 
+// dello staff e non deve ricomparire aprendo il generatore. 
 // ============================================================ 
-var BOZZA_KEY = 'af_bozza_scheda'; 
+function bozzaKey(modalita) { 
+ var m = modalita || stato.modalita; 
+ if (m === 'nuova')    return 'af_bozza_scheda_nuova'; 
+ if (m === 'modifica') return 'af_bozza_scheda_modifica'; 
+ return null; // accrediti (o modalità sconosciuta): nessuna persistenza 
+} 
 var _bozzaTimer = null; 
 
 // Contenitori con righe aggiunte dinamicamente dall'utente. Per 
@@ -191,9 +201,13 @@ function bozzaContaDinamici() {
 
 // Salva lo stato corrente. Debounce per non scrivere a ogni tasto. 
 function bozzaSalva() { 
+ // Accrediti (o modalità senza chiave): non si salva nulla. 
+ if (!bozzaKey()) return; 
  if (_bozzaTimer) clearTimeout(_bozzaTimer); 
  _bozzaTimer = setTimeout(function() { 
   try { 
+   var chiave = bozzaKey(); 
+   if (!chiave) return; 
    var campi = bozzaCampi(); 
    var dati = {}; 
    var radios = {}; 
@@ -215,7 +229,7 @@ function bozzaSalva() {
     dinamici: bozzaContaDinamici(), 
     ts: Date.now() 
    }; 
-   localStorage.setItem(BOZZA_KEY, JSON.stringify(pacchetto)); 
+   localStorage.setItem(chiave, JSON.stringify(pacchetto)); 
   } catch (e) { /* localStorage pieno o non disponibile: si prosegue senza autosave */ } 
  }, 400); 
 } 
@@ -279,9 +293,12 @@ function bozzaApplicaValori(pacchetto) {
 // Legge la bozza salvata e la valida rispetto alla modalità corrente. 
 // Ritorna il pacchetto (o null). Non applica ancora i valori. 
 function bozzaLeggi() { 
+ var chiave = bozzaKey(); 
+ if (!chiave) return null; // accrediti: nessuna bozza da leggere 
  var pacchetto = null; 
- try { pacchetto = JSON.parse(localStorage.getItem(BOZZA_KEY)); } catch (e) { pacchetto = null; } 
+ try { pacchetto = JSON.parse(localStorage.getItem(chiave)); } catch (e) { pacchetto = null; } 
  if (!pacchetto || !pacchetto.campi) return null; 
+ // La chiave è già per-modalità; questo è solo un doppio controllo. 
  if (pacchetto.modalita && stato.modalita && pacchetto.modalita !== stato.modalita) return null; 
  return pacchetto; 
 } 
@@ -307,9 +324,13 @@ function bozzaCollega() {
  root.addEventListener('change', bozzaSalva); 
 } 
 
-// Cancella la bozza (dopo generazione riuscita o su richiesta). 
+// Cancella la bozza della modalità corrente (dopo generazione 
+// riuscita o su richiesta di reset). Non tocca la bozza dell'altra 
+// modalità. 
 function bozzaCancella() { 
- try { localStorage.removeItem(BOZZA_KEY); } catch (e) {} 
+ var chiave = bozzaKey(); 
+ if (!chiave) return; 
+ try { localStorage.removeItem(chiave); } catch (e) {} 
 } 
 
 // Svuota i campi del form e cancella la bozza. Usata dal bottone 
@@ -445,10 +466,38 @@ function tornaIndietroDalForm() {
  } 
 } 
 
+// Azzera la sezione output (anteprima + codice) ed elimina ogni 
+// residuo dell'operazione di accredito precedente: il box di 
+// conferma nel DOM e le variabili di stato che lo alimentano. Va 
+// chiamata quando si entra in una modalità dal menu iniziale. 
+function resetOutputEAccrediti() { 
+ // 1) Nasconde e svuota la sezione output 
+ var out = document.getElementById('sezione-output'); 
+ if (out) out.style.display = 'none'; 
+ var box = document.getElementById('acc-conferma-box'); 
+ if (box && box.parentNode) box.parentNode.removeChild(box); 
+ var ant = document.getElementById('anteprima-scheda'); 
+ if (ant) ant.innerHTML = ''; 
+ var cod = document.getElementById('codice-html'); 
+ if (cod) cod.textContent = ''; 
+ // 2) Azzera lo stato dell'accredito in RAM 
+ stato.accBase = null; 
+ stato.diffAccredito = null; 
+ stato.accNome = null; 
+ stato.progressione = null; 
+ stato.schedaOriginale = null; 
+ stato.pgId = null; 
+} 
+
 function scegliModalita(modalita) { 
  // Guardia accrediti: la riga è visibile a tutti ma resta accessibile 
  // solo agli staff. Se un non-staff la clicca, non facciamo nulla. 
  if (modalita === 'accrediti' && !accRilevaStaff()) return; 
+ // Pulizia all'ingresso in una modalità: azzera l'output e ogni 
+ // residuo dell'accredito precedente, così il box "Registra 
+ // accredito" (con il diff dell'ultima operazione) non ricompare 
+ // entrando in Nuova/Modifica. 
+ resetOutputEAccrediti(); 
  stato.modalita = modalita; 
  var btnNuova = document.getElementById('btn-nuova'); 
  var btnModifica = document.getElementById('btn-modifica'); 
