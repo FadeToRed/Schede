@@ -330,6 +330,18 @@ function mostraSchermata(id) {
  } 
 } 
  
+// Indietro dal form: in modalità accrediti la palette è saltata, 
+// quindi si torna direttamente alla schermata iniziale; altrimenti 
+// si torna alla selezione della palette. 
+function tornaIndietroDalForm() { 
+ if (stato.modalita === 'accrediti') { 
+  mostraSchermata('schermata-scelta'); 
+ } else { 
+  mostraSchermata('schermata-palette'); 
+  costruisciGalleriaPalette(); 
+ } 
+} 
+
 function scegliModalita(modalita) { 
  // Guardia accrediti: la riga è visibile a tutti ma resta accessibile 
  // solo agli staff. Se un non-staff la clicca, non facciamo nulla. 
@@ -469,13 +481,17 @@ function riga4(a, b, c, d) {
 } 
  
 function rigaStat5(celle) { 
- var html = '<table style="width:100%; border-collapse:collapse; table-layout:fixed; margin-bottom:8px;"><tr>'; 
+ // Contenitore di celle inline-block: su desktop stanno 5 per riga 
+ // (classe .stat-cell = 20%), su mobile la media query in pagina le 
+ // porta a 2 per riga (50%). L'inline-block va a capo da solo, cosa 
+ // che una <table> table-layout:fixed non farebbe (resterebbe a 5 
+ // colonne strizzate). font-size:0 sul contenitore azzera lo spazio 
+ // bianco tra gli inline-block; le celle lo ripristinano. 
+ var html = '<div class="stat-grid" style="font-size:0; margin-bottom:8px;">'; 
  for (var i = 0; i < celle.length; i++) { 
-  var pl = i > 0 ? 'padding-left:4px;' : ''; 
-  var pr = i < celle.length - 1 ? 'padding-right:4px;' : ''; 
-  html += '<td style="width:20%; ' + pl + pr + ' vertical-align:top;">' + celle[i] + '</td>'; 
+  html += '<div class="stat-cell" style="display:inline-block; width:20%; vertical-align:top; padding:0 4px; box-sizing:border-box; font-size:initial;">' + celle[i] + '</div>'; 
  } 
- html += '</tr></table>'; 
+ html += '</div>'; 
  return html; 
 } 
  
@@ -497,6 +513,10 @@ function costruisciForm() {
   if (wrap) wrap.style.display = nome ? 'none' : ''; 
   var badge = document.getElementById('acc-staffer-badge'); 
   if (badge) badge.textContent = nome ? nome : '(da inserire)'; 
+  // Anche il form accrediti usa l'accordion: lascia aperta solo la 
+  // prima sezione. (Niente autosave qui: è un flusso staff basato 
+  // sull'importazione della scheda esistente.) 
+  accordionInit(); 
   return; 
  } 
 
@@ -580,10 +600,18 @@ function accordionToggle(header) {
    } 
   } 
   sec.className = sec.className.replace(/\bform-sec-closed\b/g, '').replace(/\s+$/, ''); 
+  accordionAggiornaChevron(sec); 
+  // Porta in vista la sezione appena aperta: chiudendo le altre la 
+  // pagina può essere rimasta scrollata altrove, quindi riallineiamo 
+  // l'header di questa sezione in cima alla viewport. 
+  var target = sec; 
+  setTimeout(function() { 
+   if (target.scrollIntoView) target.scrollIntoView({ behavior: 'smooth', block: 'start' }); 
+  }, 60); 
  } else { 
   sec.className += ' form-sec-closed'; 
+  accordionAggiornaChevron(sec); 
  } 
- accordionAggiornaChevron(sec); 
 } 
 
 function accordionAggiornaChevron(sec) { 
@@ -622,6 +650,11 @@ function sezioneForm(titolo, contenuto) {
 // ============================================================ 
 function costruisciFormAccrediti() { 
  var html = ''; 
+ // Reset contatore accordion: la modalità accrediti ha 6 sezioni 
+ // collassabili (il badge staffer in cima non è una di esse). 
+ // Senza questo reset erediterebbe i valori dell'ultimo form aperto. 
+ _sezNum = 0; 
+ _sezTot = 6; 
 
  // Badge staffer + campo manuale (mostrato solo se nome non rilevato) 
  html += '<div style="' + STILE_SEZIONE + '">'; 
