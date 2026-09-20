@@ -487,9 +487,14 @@ function rigaStat5(celle) {
  // che una <table> table-layout:fixed non farebbe (resterebbe a 5 
  // colonne strizzate). font-size:0 sul contenitore azzera lo spazio 
  // bianco tra gli inline-block; le celle lo ripristinano. 
+ // Larghezza e box model stanno SOLO nella classe .stat-cell (nel CSS 
+ // della pagina), non inline: uno stile inline batterebbe la media 
+ // query mobile e le celle resterebbero a 5 per riga. Inline lasciamo 
+ // solo font-size:initial, per ripristinare il testo dopo il 
+ // font-size:0 del contenitore (che elimina gli spazi tra inline-block). 
  var html = '<div class="stat-grid" style="font-size:0; margin-bottom:8px;">'; 
  for (var i = 0; i < celle.length; i++) { 
-  html += '<div class="stat-cell" style="display:inline-block; width:20%; vertical-align:top; padding:0 4px; box-sizing:border-box; font-size:initial;">' + celle[i] + '</div>'; 
+  html += '<div class="stat-cell" style="font-size:initial;">' + celle[i] + '</div>'; 
  } 
  html += '</div>'; 
  return html; 
@@ -607,7 +612,7 @@ function accordionToggle(header) {
   // spazio sopra, così il titolo (es. "Dati Personali") non finisce 
   // incollato al bordo alto ma resta ben leggibile. 
   var target = sec; 
-  target.style.scrollMarginTop = '20px'; 
+  target.style.scrollMarginTop = '80px'; 
   setTimeout(function() { 
    if (target.scrollIntoView) target.scrollIntoView({ behavior: 'smooth', block: 'start' }); 
   }, 60); 
