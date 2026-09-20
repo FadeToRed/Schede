@@ -603,8 +603,11 @@ function accordionToggle(header) {
   accordionAggiornaChevron(sec); 
   // Porta in vista la sezione appena aperta: chiudendo le altre la 
   // pagina può essere rimasta scrollata altrove, quindi riallineiamo 
-  // l'header di questa sezione in cima alla viewport. 
+  // l'header di questa sezione. Lo scroll-margin-top lascia un po' di 
+  // spazio sopra, così il titolo (es. "Dati Personali") non finisce 
+  // incollato al bordo alto ma resta ben leggibile. 
   var target = sec; 
+  target.style.scrollMarginTop = '20px'; 
   setTimeout(function() { 
    if (target.scrollIntoView) target.scrollIntoView({ behavior: 'smooth', block: 'start' }); 
   }, 60); 
