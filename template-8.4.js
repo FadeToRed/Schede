@@ -486,21 +486,26 @@ function generaScheda() {
   htmlAnteprima = costruisciHTMLAnteprimaScheda(d, isNuova, classeContenitore, classeOriginale, styleOriginale); 
  } 
  
- // Stile anteprima allineato a schede-v4.css per la slide "Info": 
- // senza il CSS del forum, l'anteprima deve replicare da sé il 
- // layout delle immagini info e dei box testo, altrimenti la seconda 
- // immagine (modo 2 immagini) risulta sfasata verso il basso. 
- // Le img sono INLINE con margin-bottom:5px (NON display:block, che 
- // sommato al <br> nel markup creava un doppio a capo); i box testo 
- // sono alti 220px come nella scheda reale, così le due immagini da 
- // 220px si allineano a "Descrizione" e "Background". 
+ // Stile anteprima allineato a schede-v4.css per la slide "Info". 
+ // Senza il CSS del forum, l'anteprima deve replicare da sé il layout 
+ // della slide info, altrimenti la seconda immagine (modo 2 immagini) 
+ // risulta sfasata verso il basso. 
+ // 
+ // Regole copiate 1:1 da schede-v4.css (righe .img-info / .img-info2 / 
+ // .info-aspetto / .info-storia). Punti importanti: 
+ // - box-sizing di DEFAULT (content-box), NON border-box: sia le 
+ //   immagini sia i box testo hanno border 4px + padding 4px, quindi 
+ //   entrambi misurano 220+8+8 = 236px reali e si allineano. 
+ // - le img sono INLINE (niente display:block, che sommato al <br> 
+ //   nel markup spingeva giù la seconda immagine). 
+ // - il bordo usa var(--bordo), definita dalla classe palette del 
+ //   contenitore scheda presente nell'anteprima. 
  var stileAnteprima = 
   '<style>' + 
-  '#anteprima-scheda .img-info2{float:left;margin:5px;margin-top:0;}' + 
-  '#anteprima-scheda .img-info2 img{height:220px;width:170px;padding:4px;object-fit:cover;margin-bottom:5px;box-sizing:content-box;vertical-align:top;}' + 
-  '#anteprima-scheda .img-info{float:left;margin:5px;margin-top:0;}' + 
-  '#anteprima-scheda .img-info img{height:445px;width:170px;padding:4px;object-fit:cover;box-sizing:content-box;vertical-align:top;}' + 
-  '#anteprima-scheda .info-aspetto,#anteprima-scheda .info-storia{max-width:505px;height:220px;overflow-y:scroll;margin:5px;padding:4px;text-align:left;box-sizing:border-box;}' + 
+  '#anteprima-scheda .img-info,#anteprima-scheda .img-info2{float:left;margin:5px;margin-top:0;}' + 
+  '#anteprima-scheda .img-info img{height:445px;border:4px solid var(--bordo);width:170px;padding:4px;object-fit:cover;vertical-align:top;}' + 
+  '#anteprima-scheda .img-info2 img{height:220px;border:4px solid var(--bordo);width:170px;padding:4px;object-fit:cover;margin-bottom:5px;vertical-align:top;}' + 
+  '#anteprima-scheda .info-aspetto,#anteprima-scheda .info-storia{max-width:505px;height:220px;overflow-y:scroll;margin:5px;border:4px solid var(--bordo);padding:4px;text-align:left;}' + 
   '</style>'; 
  document.getElementById('anteprima-scheda').innerHTML = stileAnteprima + htmlAnteprima; 
  document.getElementById('codice-html').textContent = htmlScheda; 
