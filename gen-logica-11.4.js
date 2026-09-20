@@ -2710,7 +2710,27 @@ function importaPuliziaForm() {
   var s0 = document.getElementById('campo-status-0'); 
   if (s0) s0.selectedIndex = 0; 
  } 
- // 3) Cancella la bozza corrente: sta per essere rimpiazzata. 
+ // 3) Immagini: azzera URL, valori di crop e la memoria data-crop-url 
+ // di ogni bottone, così una scheda importata senza (o con) crop non 
+ // eredita l'inquadratura di una importata prima. 
+ var cropIds = ['img-laterale','img-dati','img-info','img-info-a','img-info-b','img-nen']; 
+ var urlMap = { 
+  'img-laterale':'campo-img-laterale','img-dati':'campo-img-dati', 
+  'img-info':'campo-img-info','img-info-a':'campo-img-info-a', 
+  'img-info-b':'campo-img-info-b','img-nen':'nen-img' 
+ }; 
+ for (var k = 0; k < cropIds.length; k++) { 
+  var cid = cropIds[k]; 
+  var u = document.getElementById(urlMap[cid]); 
+  if (u) u.value = ''; 
+  var cx = document.getElementById('crop-x-'+cid); if (cx) cx.value = 0; 
+  var cy = document.getElementById('crop-y-'+cid); if (cy) cy.value = 0; 
+  var cw = document.getElementById('crop-w-'+cid); if (cw) cw.value = 100; 
+  var ch = document.getElementById('crop-h-'+cid); if (ch) ch.value = 100; 
+  var b = document.getElementById('crop-btn-'+cid); 
+  if (b) b.removeAttribute('data-crop-url'); 
+ } 
+ // 4) Cancella la bozza corrente: sta per essere rimpiazzata. 
  if (typeof bozzaCancella === 'function') bozzaCancella(); 
 } 
 
@@ -3151,6 +3171,19 @@ function importaScheda() {
   var w = parseFloat(imgEl.getAttribute('data-cw'));
   var h = parseFloat(imgEl.getAttribute('data-ch'));
   if (!isNaN(x) && !isNaN(y) && !isNaN(w) && !isNaN(h)) {
+   // Prima di scrivere i crop, allineiamo data-crop-url del bottone
+   // all'URL appena importato. cropScrivi chiama cropAggiornaBottone,
+   // che ha una guardia: se l'URL corrente ≠ data-crop-url, AZZERA i
+   // crop (pensando che l'immagine sia cambiata). Senza questo
+   // allineamento la guardia scatterebbe e resetterebbe l'inquadratura
+   // appena importata dalla scheda.
+   var btn = document.getElementById('crop-btn-' + cropId);
+   var urlEl = document.getElementById({
+    'img-laterale':'campo-img-laterale','img-dati':'campo-img-dati',
+    'img-info':'campo-img-info','img-info-a':'campo-img-info-a',
+    'img-info-b':'campo-img-info-b','img-nen':'nen-img'
+   }[cropId]);
+   if (btn && urlEl) btn.setAttribute('data-crop-url', urlEl.value ? urlEl.value.trim() : '');
    cropScrivi(cropId, x, y, w, h);
   }
  }
@@ -3204,6 +3237,11 @@ function importaScheda() {
  } 
 
  aggiornaCompetenze(); 
+ // Salva la bozza con i dati appena importati: i setVal dell'import 
+ // non emettono eventi, quindi senza questa scrittura esplicita la 
+ // scheda importata non finirebbe in memoria (e ricaricando la 
+ // pagina la si perderebbe). 
+ if (typeof bozzaScriviOra === 'function') bozzaScriviOra(); 
  alert('Dati importati! Controlla i campi e poi genera la scheda.'); 
 } 
 
