@@ -486,8 +486,23 @@ function generaScheda() {
   htmlAnteprima = costruisciHTMLAnteprimaScheda(d, isNuova, classeContenitore, classeOriginale, styleOriginale); 
  } 
  
- document.getElementById('anteprima-scheda').innerHTML = 
-  '<style>#anteprima-scheda .img-info2 img{display:block;margin:0 auto 8px;}</style>' + htmlAnteprima; 
+ // Stile anteprima allineato a schede-v4.css per la slide "Info": 
+ // senza il CSS del forum, l'anteprima deve replicare da sé il 
+ // layout delle immagini info e dei box testo, altrimenti la seconda 
+ // immagine (modo 2 immagini) risulta sfasata verso il basso. 
+ // Le img sono INLINE con margin-bottom:5px (NON display:block, che 
+ // sommato al <br> nel markup creava un doppio a capo); i box testo 
+ // sono alti 220px come nella scheda reale, così le due immagini da 
+ // 220px si allineano a "Descrizione" e "Background". 
+ var stileAnteprima = 
+  '<style>' + 
+  '#anteprima-scheda .img-info2{float:left;margin:5px;margin-top:0;}' + 
+  '#anteprima-scheda .img-info2 img{height:220px;width:170px;padding:4px;object-fit:cover;margin-bottom:5px;box-sizing:content-box;vertical-align:top;}' + 
+  '#anteprima-scheda .img-info{float:left;margin:5px;margin-top:0;}' + 
+  '#anteprima-scheda .img-info img{height:445px;width:170px;padding:4px;object-fit:cover;box-sizing:content-box;vertical-align:top;}' + 
+  '#anteprima-scheda .info-aspetto,#anteprima-scheda .info-storia{max-width:505px;height:220px;overflow-y:scroll;margin:5px;padding:4px;text-align:left;box-sizing:border-box;}' + 
+  '</style>'; 
+ document.getElementById('anteprima-scheda').innerHTML = stileAnteprima + htmlAnteprima; 
  document.getElementById('codice-html').textContent = htmlScheda; 
  document.getElementById('sezione-output').style.display = 'block'; 
 
@@ -500,9 +515,10 @@ function generaScheda() {
 
  document.getElementById('sezione-output').scrollIntoView({ behavior:'smooth' }); 
  
- // Scheda generata con successo: la bozza non serve più. 
- // (In accrediti non c'è autosave, ma la chiamata è comunque innocua.) 
- if (!isAccrediti && typeof bozzaCancella === 'function') bozzaCancella(); 
+ // NB: la bozza NON viene cancellata dopo la generazione. Così, se 
+ // guardando l'anteprima ci si accorge che qualcosa va corretto, i 
+ // dati sono ancora tutti compilati. La bozza si azzera solo con il 
+ // pulsante "Resetta". 
 } 
 
 // Mostra, nella sezione output, il riepilogo del diff e il bottone che 
