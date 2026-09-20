@@ -202,39 +202,44 @@ function bozzaContaDinamici() {
  return conteggi; 
 } 
 
-// Salva lo stato corrente. Debounce per non scrivere a ogni tasto. 
-function bozzaSalva() { 
- // Accrediti (o modalità senza chiave): non si salva nulla. 
- if (!bozzaKey()) return; 
- if (_bozzaTimer) clearTimeout(_bozzaTimer); 
- _bozzaTimer = setTimeout(function() { 
-  try { 
-   var chiave = bozzaKey(); 
-   if (!chiave) return; 
-   var campi = bozzaCampi(); 
-   var dati = {}; 
-   var radios = {}; 
-   for (var i = 0; i < campi.length; i++) { 
-    var el = campi[i]; 
-    var t = (el.type || '').toLowerCase(); 
-    if (t === 'checkbox') { dati[el.id] = el.checked ? 1 : 0; } 
-    else if (t === 'radio') { 
-     // I radio si salvano per gruppo (name), non per id. 
-     if (el.checked && el.name) radios['radio:' + el.name] = el.value; 
-    } 
-    else { dati[el.id] = el.value; } 
+// Scrive SUBITO la bozza (senza debounce). Usata per le azioni 
+// discrete e importanti — come la conferma del crop — dove un 
+// salvataggio ritardato potrebbe non fare in tempo se l'utente 
+// esce/ricarica subito dopo. 
+function bozzaScriviOra() { 
+ var chiave = bozzaKey(); 
+ if (!chiave) return; // accrediti o modalità senza chiave 
+ try { 
+  var campi = bozzaCampi(); 
+  var dati = {}; 
+  var radios = {}; 
+  for (var i = 0; i < campi.length; i++) { 
+   var el = campi[i]; 
+   var t = (el.type || '').toLowerCase(); 
+   if (t === 'checkbox') { dati[el.id] = el.checked ? 1 : 0; } 
+   else if (t === 'radio') { 
+    if (el.checked && el.name) radios['radio:' + el.name] = el.value; 
    } 
-   var pacchetto = { 
-    modalita: stato.modalita, 
-    palette: stato.palette, 
-    campi: dati, 
-    radios: radios, 
-    dinamici: bozzaContaDinamici(), 
-    ts: Date.now() 
-   }; 
-   localStorage.setItem(chiave, JSON.stringify(pacchetto)); 
-  } catch (e) { /* localStorage pieno o non disponibile: si prosegue senza autosave */ } 
- }, 400); 
+   else { dati[el.id] = el.value; } 
+  } 
+  var pacchetto = { 
+   modalita: stato.modalita, 
+   palette: stato.palette, 
+   campi: dati, 
+   radios: radios, 
+   dinamici: bozzaContaDinamici(), 
+   ts: Date.now() 
+  }; 
+  localStorage.setItem(chiave, JSON.stringify(pacchetto)); 
+ } catch (e) { /* localStorage pieno o non disponibile: si prosegue senza autosave */ } 
+} 
+
+// Salva lo stato corrente con debounce (per non scrivere a ogni tasto 
+// durante la digitazione nei campi di testo). 
+function bozzaSalva() { 
+ if (!bozzaKey()) return; // accrediti: niente salvataggio 
+ if (_bozzaTimer) clearTimeout(_bozzaTimer); 
+ _bozzaTimer = setTimeout(bozzaScriviOra, 400); 
 } 
 
 // Ricrea le righe dinamiche salvate, così i loro campi esistono nel 
@@ -316,19 +321,28 @@ function bozzaRipristina() {
  return true; 
 } 
 
-// Dopo il ripristino: ridisegna le anteprime di crop nei bottoni 
-// "Modifica inquadratura". URL e valori di crop sono già stati 
-// reinseriti da bozzaApplicaValori; qui rigeneriamo la preview 
-// visiva per ogni immagine, così il riquadro riflette l'inquadratura 
-// salvata invece di apparire vuoto. 
+// Dopo il ripristino, riallinea la parte VISIVA della slide info al 
+// dato ripristinato: 
+// 1) se la bozza aveva "due immagini" (radio img-info-modo = 2), 
+//    attiva quella modalità così i campi della 2ª immagine compaiono 
+//    (il radio da solo non basta: va chiamata aggiornaInputImgInfo). 
+// 2) ridisegna le anteprime di crop nei bottoni "Modifica 
+//    inquadratura", con URL e inquadrature già reinseriti. 
 function bozzaRidisegnaCrop() { 
- if (typeof cropAggiornaBottone !== 'function') return; 
- var btns = document.querySelectorAll('[id^="crop-btn-"]'); 
- for (var i = 0; i < btns.length; i++) { 
-  var id = btns[i].id.replace('crop-btn-', ''); 
-  // Il bottone parte senza data-crop-url, quindi la guardia 
-  // anti-cambio-immagine non azzera il crop appena ripristinato. 
-  try { cropAggiornaBottone(id); } catch (e) {} 
+ // 1) Modo una/due immagini della slide info 
+ if (typeof aggiornaInputImgInfo === 'function' && 
+     document.getElementById('img-info-wrap-1')) { 
+  try { aggiornaInputImgInfo(); } catch (e) {} 
+ } 
+ // 2) Anteprime di crop 
+ if (typeof cropAggiornaBottone === 'function') { 
+  var btns = document.querySelectorAll('[id^="crop-btn-"]'); 
+  for (var i = 0; i < btns.length; i++) { 
+   var id = btns[i].id.replace('crop-btn-', ''); 
+   // Il bottone parte senza data-crop-url, quindi la guardia 
+   // anti-cambio-immagine non azzera il crop appena ripristinato. 
+   try { cropAggiornaBottone(id); } catch (e) {} 
+  } 
  } 
 } 
 
@@ -1476,8 +1490,10 @@ function cropScrivi(id, x, y, w, h) {
  if (eh) eh.value = r2(h);
  cropAggiornaBottone(id);
  // I crop sono hidden input: modificarli via JS non emette eventi, 
- // quindi salviamo esplicitamente la bozza. 
- if (typeof bozzaSalva === 'function') bozzaSalva();
+ // quindi salviamo esplicitamente. Scrittura IMMEDIATA (non debounced) 
+ // perché è un'azione discreta: se l'utente esce subito dopo aver 
+ // confermato l'inquadratura, un salvataggio ritardato la perderebbe. 
+ if (typeof bozzaScriviOra === 'function') bozzaScriviOra();
 }
 
 // ── Aggiorna il bottone "Modifica inquadratura" con una preview inline ────
@@ -2677,9 +2693,37 @@ function bbcodeToHtml(testo) {
  return testo;
 }
  
+// Azzera il form prima di importare una scheda: svuota le liste 
+// dinamiche (baule, tecniche, status extra) e cancella la bozza, così 
+// i dati importati sostituiscono e non si sommano a quelli presenti. 
+function importaPuliziaForm() { 
+ // 1) Svuota completamente i contenitori del baule e delle tecniche. 
+ var contenitoriVuoti = ['lista-armi','lista-equip','lista-oggetti','lista-materiali','lista-tecniche']; 
+ for (var i = 0; i < contenitoriVuoti.length; i++) { 
+  var c = document.getElementById(contenitoriVuoti[i]); 
+  if (c) c.innerHTML = ''; 
+ } 
+ // 2) Status: rimuove le righe extra e azzera quella base (row-0). 
+ var ls = document.getElementById('lista-status'); 
+ if (ls) { 
+  while (ls.children.length > 1) ls.removeChild(ls.lastChild); 
+  var s0 = document.getElementById('campo-status-0'); 
+  if (s0) s0.selectedIndex = 0; 
+ } 
+ // 3) Cancella la bozza corrente: sta per essere rimpiazzata. 
+ if (typeof bozzaCancella === 'function') bozzaCancella(); 
+} 
+
 function importaScheda() { 
  var htmlScheda = document.getElementById('campo-importa').value.trim(); 
  if (!htmlScheda) { alert('Incolla prima il codice HTML!'); return; } 
+ // Prima di popolare: azzera il form. L'import RIMPIAZZA i dati, non 
+ // li aggiunge. Senza questa pulizia, le righe dinamiche già presenti 
+ // (da una bozza ripristinata o da un import precedente) si 
+ // sommerebbero a quelle della nuova scheda (es. baule con oggetti di 
+ // due schede diverse). Cancella anche la bozza, che sta per essere 
+ // sostituita dai dati della scheda importata. 
+ importaPuliziaForm(); 
  // Converte BBCode in HTML (ForumFree trasforma img e link in BBCode nei post) 
  htmlScheda = bbcodeToHtml(htmlScheda); 
  var temp = document.createElement('div'); 
