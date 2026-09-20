@@ -164,7 +164,12 @@ var BOZZA_DINAMICI = [
 ]; 
 
 // Un campo va salvato se è un input/select/textarea compilabile e 
-// non è readonly, disabled o un campo immagine (crop). 
+// non è readonly o disabled. 
+// NB: le immagini qui sono URL (testo), non file caricati: insieme ai 
+// valori di crop (crop-x/y/w/h, semplici percentuali) occupano pochi 
+// byte, quindi VENGONO salvati come ogni altro campo. Escludiamo solo 
+// gli input di tipo file (che porterebbero dati binari pesanti): nel 
+// form attuale non ce ne sono, ma la guardia resta per sicurezza. 
 function bozzaCampoValido(el) { 
  var tag = (el.tagName || '').toLowerCase(); 
  if (tag !== 'input' && tag !== 'select' && tag !== 'textarea') return false; 
@@ -172,8 +177,6 @@ function bozzaCampoValido(el) {
  if (el.readOnly || el.disabled) return false; 
  var t = (el.type || '').toLowerCase(); 
  if (t === 'file' || t === 'button' || t === 'submit') return false; 
- // Esclude i campi legati alle immagini/crop (id tipo "...img..."). 
- if (el.id.indexOf('img') !== -1 || el.id.indexOf('crop') !== -1) return false; 
  return true; 
 } 
 
@@ -311,6 +314,22 @@ function bozzaRipristina() {
  bozzaRicreaDinamici(pacchetto.dinamici); 
  bozzaApplicaValori(pacchetto); 
  return true; 
+} 
+
+// Dopo il ripristino: ridisegna le anteprime di crop nei bottoni 
+// "Modifica inquadratura". URL e valori di crop sono già stati 
+// reinseriti da bozzaApplicaValori; qui rigeneriamo la preview 
+// visiva per ogni immagine, così il riquadro riflette l'inquadratura 
+// salvata invece di apparire vuoto. 
+function bozzaRidisegnaCrop() { 
+ if (typeof cropAggiornaBottone !== 'function') return; 
+ var btns = document.querySelectorAll('[id^="crop-btn-"]'); 
+ for (var i = 0; i < btns.length; i++) { 
+  var id = btns[i].id.replace('crop-btn-', ''); 
+  // Il bottone parte senza data-crop-url, quindi la guardia 
+  // anti-cambio-immagine non azzera il crop appena ripristinato. 
+  try { cropAggiornaBottone(id); } catch (e) {} 
+ } 
 } 
 
 // Collega il salvataggio al form. Usa event delegation sul 
@@ -748,6 +767,8 @@ function costruisciForm() {
    bozzaApplicaValori(pacchetto); 
    aggiornaCompetenze(); 
   } 
+  // Ridisegna le anteprime di crop con URL e inquadrature ripristinati. 
+  bozzaRidisegnaCrop(); 
  } 
  
  // Collega l'autosave dopo il ripristino, così il primo salvataggio 
@@ -1454,6 +1475,9 @@ function cropScrivi(id, x, y, w, h) {
  if (ew) ew.value = r2(w);
  if (eh) eh.value = r2(h);
  cropAggiornaBottone(id);
+ // I crop sono hidden input: modificarli via JS non emette eventi, 
+ // quindi salviamo esplicitamente la bozza. 
+ if (typeof bozzaSalva === 'function') bozzaSalva();
 }
 
 // ── Aggiorna il bottone "Modifica inquadratura" con una preview inline ────
