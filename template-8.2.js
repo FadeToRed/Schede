@@ -219,9 +219,14 @@ function aggiornaHTMLScheda(d) {
  } 
  
  // ── Musica ───────────────────────────────────────────────── 
+ // Guardia accrediti: musica === null significa "non toccare" (il 
+ // form accrediti non ha il campo musica). Solo una stringa vuota 
+ // esplicita ('') rimuove la musica; un valore la aggiorna. 
  var btn = qs('.custom-player'); 
  var iframes = root[metodo]('iframe'); 
- if (d.musica) { 
+ if (d.musica === null || d.musica === undefined) { 
+  /* accrediti: lascia la musica (bottone + iframe) com'era */ 
+ } else if (d.musica) { 
   var nuovoSrc = d.musicaPiattaforma === 'soundcloud'
    ? 'https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/tracks/' + d.musica
    : 'https://www.youtube.com/embed/' + d.musica + '?enablejsapi=1';
